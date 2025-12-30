@@ -1,0 +1,28 @@
+{
+  "name": "local-clothing-brand-ecommerce",
+  "version": "1.0.0",
+  "description": "A secure e-commerce backend for a local clothing brand using Supabase",
+  "main": "index.js",
+  "scripts": {
+    "setup": "echo 'Please follow the SETUP_GUIDE.md to set up the project'",
+    "docs": "echo 'Please see the README.md and API_DOCUMENTATION.md for documentation'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/local-clothing-brand-ecommerce.git"
+  },
+  "keywords": [
+    "ecommerce",
+    "supabase",
+    "clothing",
+    "retail",
+    "myanmar",
+    "kbz-pay"
+  ],
+  "author": "Sitt Min Thar",
+  "license": "MIT",
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "@types/node": "^18.0.0"
+  }
+}
