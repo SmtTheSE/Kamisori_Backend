@@ -351,7 +351,7 @@ const { data: orderDetails, error } = await supabase.rpc('get_order_details_admi
 
 ### Notification System
 
-When customers place an order or upload payment slips, the system automatically notifies the admin via email:
+When customers place an order or upload payment slips, the system automatically notifies the admin via email using Gmail SMTP:
 
 1. **New Order Notification**: Triggered when a customer completes checkout
 2. **Payment Slip Notification**: Triggered when a customer uploads a payment slip for KBZ Pay orders

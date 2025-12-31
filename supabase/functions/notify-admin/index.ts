@@ -1,83 +1,140 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.0.5";
 
-// This function is called when a payment slip is uploaded or when a new order is placed
-// It sends an email notification to the admin
+// Polyfill for Deno.writeAll and readAll (removed in recent Deno versions)
+// This is required for the 'smtp' library to work on Supabase
+if (!(Deno as any).writeAll) {
+  (Deno as any).writeAll = async (w: any, arr: Uint8Array) => {
+    let nwritten = 0;
+    while (nwritten < arr.length) {
+      const n = await w.write(arr.subarray(nwritten));
+      if (n === null) break;
+      nwritten += n;
+    }
+  };
+}
+if (!(Deno as any).readAll) {
+  (Deno as any).readAll = async (r: any) => {
+    const buf = new Uint8Array(1024);
+    let out = new Uint8Array(0);
+    while (true) {
+      const n = await r.read(buf);
+      if (n === null || n === 0) break;
+      const tmp = new Uint8Array(out.length + n);
+      tmp.set(out);
+      tmp.set(buf.subarray(0, n), out.length);
+      out = tmp;
+    }
+    return out;
+  };
+}
+
+import { SmtpClient } from "https://deno.land/x/smtp/mod.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to send email via Gmail SMTP
+async function sendGmail(to: string, subject: string, html: string) {
+  const SMTP_USER = Deno.env.get("SMTP_USER");
+  const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD");
+
+  if (!SMTP_USER || !SMTP_PASSWORD) {
+    throw new Error("SMTP_USER or SMTP_PASSWORD environment variables are missing");
+  }
+
+  const client = new SmtpClient();
+
+  try {
+    await client.connectTLS({
+      hostname: "smtp.gmail.com",
+      port: 465,
+      username: SMTP_USER,
+      password: SMTP_PASSWORD,
+    });
+
+    await client.send({
+      from: SMTP_USER,
+      to: to,
+      subject: subject,
+      content: html,
+      html: html,
+    });
+
+    await client.close();
+    return { success: true };
+  } catch (error: any) {
+    console.error("SMTP Error:", error);
+    try { await client.close(); } catch (_) { }
+    throw error;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Get the payload from the trigger
     const payload = await req.json();
     const { order_id, slip_url, notification_type } = payload;
 
-    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    const adminEmail = Deno.env.get("ADMIN_EMAIL") || "sittminthar005@gmail.com";
+
     console.log("Notification trigger received:", { order_id, notification_type });
 
-    // Handle TEST PING (Diagnostic)
+    // Handle TEST PING
     if (notification_type === 'test_ping') {
-      const adminEmail = Deno.env.get("ADMIN_EMAIL") || "sittminthar005@gmail.com";
-      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-
       await supabaseClient.from("trigger_logs").insert({
         level: 'info',
-        message: 'TEST PING STARTED',
-        details: { adminEmail, hasKey: !!RESEND_API_KEY }
+        message: 'TEST PING STARTED (SMTP)',
+        details: { adminEmail, hasSmtpUser: !!Deno.env.get("SMTP_USER") }
       });
 
-      if (!RESEND_API_KEY) {
-        return new Response(JSON.stringify({ error: "RESEND_API_KEY missing" }), {
+      try {
+        await sendGmail(
+          adminEmail,
+          '🔔 Diagnostic Test Email (SMTP)',
+          '<h1>It Works!</h1><p>If you see this, your Edge Function and Gmail SMTP configuration are working perfectly.</p>'
+        );
+
+        await supabaseClient.from("trigger_logs").insert({
+          level: 'info',
+          message: 'TEST EMAIL SENT (SMTP)',
+          details: { to: adminEmail }
+        });
+
+        return new Response(JSON.stringify({ success: true, message: "Test email sent" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err: any) {
+        await supabaseClient.from("trigger_logs").insert({
+          level: 'error',
+          message: 'TEST EMAIL FAILED (SMTP)',
+          details: { error: err.message }
+        });
+        return new Response(JSON.stringify({ success: false, error: err.message }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'Kamisori Diagnostic <onboarding@resend.dev>',
-          to: [adminEmail],
-          subject: '🔔 Diagnostic Test Email',
-          html: '<h1>It Works!</h1><p>If you see this, your Edge Function and Resend configuration are working perfectly.</p>',
-        }),
-      });
-
-      const resData = await res.json();
-      await supabaseClient.from("trigger_logs").insert({
-        level: res.ok ? 'info' : 'error',
-        message: res.ok ? 'TEST EMAIL SENT' : 'TEST EMAIL FAILED',
-        details: resData
-      });
-
-      return new Response(JSON.stringify({ success: res.ok, data: resData }), {
-        status: res.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
     }
 
-    // Normal flow starts here
+    // Normal flow
     await supabaseClient.from("trigger_logs").insert({
       level: 'info',
       message: `Processing ${notification_type} for order ${order_id}`,
       order_id
     });
+
     const { data: order, error: orderError } = await supabaseClient
       .from("orders")
       .select(`
@@ -110,50 +167,36 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      console.error("Order fetch error:", orderError);
       throw new Error(`Error fetching order: ${orderError?.message || 'Order not found'}`);
     }
 
-    // Fetch user details separately using Service Role (via auth admin)
-    // This is much more reliable than joining auth.users which is restricted
-    const { data: userData, error: userError } = await supabaseClient.auth.admin.getUserById(order.user_id);
-
-    if (userError || !userData?.user) {
-      console.error("User fetch error:", userError);
-      // We don't throw here, just fallback to payload email if available
-    }
-
+    const { data: userData } = await supabaseClient.auth.admin.getUserById(order.user_id);
     const customerEmail = userData?.user?.email || payload.user_email || "N/A";
     const userMeta = userData?.user?.user_metadata || {};
 
-
-    // Get admin email
-    const adminEmail = Deno.env.get("ADMIN_EMAIL") || "admin@example.com";
+    let subject = "";
+    let htmlContent = "";
 
     if (notification_type === 'new_order') {
-      // Prepare email content
-      const subject = `New Order #${order.id.substring(0, 8)} Received`;
-
-      // Format products list
+      subject = `New Order #${order.id.substring(0, 8)} Received`;
       const productsList = order.order_items.map(item => {
         const variants = [];
         if (item.size) variants.push(`Size: ${item.size}`);
         if (item.color) variants.push(`Color: ${item.color}`);
         const variantsText = variants.length > 0 ? ` (${variants.join(', ')})` : '';
-
-        return `- ${item.products.name}${variantsText} x${item.quantity} - $${item.price}`;
+        return `- ${item.products.name}${variantsText} x${item.quantity} - ${item.price} MMK`;
       }).join('<br>');
 
       const deliveryAddress = order.delivery_addresses?.[0] || null;
       const customerFullName = deliveryAddress?.full_name || userMeta.full_name || userMeta.name || customerEmail;
 
-      const htmlContent = `
+      htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: #333; border-bottom: 2px solid #333; padding-bottom: 10px;">New Order Received</h2>
           <div style="margin-bottom: 20px;">
             <p><strong>Order ID:</strong> #${order.id.substring(0, 8)}</p>
-            <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}</p>
-            <p><strong>Total Amount:</strong> <span style="font-size: 1.2em; color: #2e7d32;">$${order.total_amount}</span></p>
+            <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p><strong>Total Amount:</strong> <span style="font-size: 1.2em; color: #2e7d32;">${order.total_amount} MMK</span></p>
             <p><strong>Payment Method:</strong> ${order.payment_method.toUpperCase().replace('_', ' ')}</p>
             <p><strong>Status:</strong> <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px;">${order.status}</span></p>
           </div>
@@ -166,98 +209,46 @@ serve(async (req) => {
           <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Ordered Items</h3>
           <div style="margin-bottom: 20px;">${productsList}</div>
           <p style="font-size: 0.9em; color: #666; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
-            This is an automated notification from your Kamisori E-Commerce platform.
+            Kamisori E-Commerce - Admin Notification (SMTP)
           </p>
         </div>
       `;
-
-      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-
-      if (RESEND_API_KEY) {
-        try {
-          const res = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${RESEND_API_KEY}`,
-            },
-            body: JSON.stringify({
-              from: 'Kamisori Notifications <onboarding@resend.dev>',
-              to: [adminEmail],
-              subject: subject,
-              html: htmlContent,
-            }),
-          });
-
-          const resData = await res.json();
-          if (!res.ok) {
-            await supabaseClient.from("trigger_logs").insert({
-              level: 'error',
-              message: `Email FAILED (Status ${res.status})`,
-              order_id,
-              details: resData
-            });
-          } else {
-            await supabaseClient.from("trigger_logs").insert({
-              level: 'info',
-              message: `Email SENT successfully. ID: ${resData.id}`,
-              order_id,
-              details: { resData }
-            });
-          }
-        } catch (err: any) {
-          await supabaseClient.from("trigger_logs").insert({
-            level: 'error',
-            message: `CRITICAL ERROR: ${err.message || 'Unknown'}`,
-            order_id,
-            details: { stack: err.stack }
-          });
-        }
-      } else {
-        await supabaseClient.from("trigger_logs").insert({
-          level: 'warning',
-          message: 'Email skipped: RESEND_API_KEY missing',
-          order_id
-        });
-      }
-
     } else if (notification_type === 'payment_uploaded') {
-      const subject = `💳 Payment Slip Uploaded - Order #${order.id.substring(0, 8)}`;
-
-      const htmlContent = `
+      subject = `💳 Payment Slip Uploaded - Order #${order.id.substring(0, 8)}`;
+      htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: #333; border-bottom: 2px solid #333; padding-bottom: 10px;">Payment Slip Received</h2>
           <p>A customer has uploaded a payment slip for their order. Please verify the transaction.</p>
-          
           <div style="background: #fdf2f2; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
              <p><strong>Order ID:</strong> #${order.id.substring(0, 8)}</p>
-             <p><strong>Amount:</strong> $${order.total_amount}</p>
+             <p><strong>Amount:</strong> ${order.total_amount} MMK</p>
              <p><strong>Customer:</strong> ${customerEmail}</p>
           </div>
-
           <a href="${slip_url}" style="display: block; width: 200px; background: #3b82f6; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; margin: 20px 0;">View Payment Slip</a>
-          
           <p style="font-size: 0.9em; color: #666; border-top: 1px solid #eee; padding-top: 10px;">
-            Kamisori E-Commerce - Admin Notification
+            Kamisori E-Commerce - Admin Notification (SMTP)
           </p>
         </div>
       `;
+    }
 
-      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-      if (RESEND_API_KEY) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
-          body: JSON.stringify({
-            from: 'Kamisori Payments <onboarding@resend.dev>',
-            to: [adminEmail],
-            subject: subject,
-            html: htmlContent,
-          }),
+    if (subject && htmlContent) {
+      try {
+        await sendGmail(adminEmail, subject, htmlContent);
+        await supabaseClient.from("trigger_logs").insert({
+          level: 'info',
+          message: `Email SENT successfully via SMTP`,
+          order_id
+        });
+      } catch (err: any) {
+        await supabaseClient.from("trigger_logs").insert({
+          level: 'error',
+          message: `SMTP SEND FAILED: ${err.message}`,
+          order_id,
+          details: { error: err.message }
         });
       }
     }
-
 
     return new Response(
       JSON.stringify({ message: "Notification processed successfully" }),

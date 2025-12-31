@@ -547,7 +547,7 @@
                         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                             <div>Total Customers: <strong>${metric.total_customers}</strong></div>
                             <div>Total Orders: <strong>${metric.total_orders}</strong></div>
-                            <div>Total Revenue: <strong>$${metric.total_revenue || 0}</strong></div>
+                            <div>Total Revenue: <strong>${metric.total_revenue || 0} MMK</strong></div>
                             <div>Pending Orders: <strong>${metric.pending_orders}</strong></div>
                             <div>Processing: <strong>${metric.processing_orders}</strong></div>
                         </div>
@@ -674,7 +674,7 @@
                     row.innerHTML = `
                         <td>${product.id.substring(0, 8)}...</td>
                         <td>${product.name}</td>
-                        <td>$${product.price}</td>
+                        <td>${product.price} MMK</td>
                         <td>${product.stock || 0}</td>
                         <td>${categoryLabels[index]}</td>
                         <td>${product.is_active ? 'Yes' : 'No'}</td>
@@ -884,7 +884,7 @@
                     row.innerHTML = `
                         <td>${slip.order_id.substring(0, 8)}...</td>
                         <td>${slip.customer_name || slip.customer_email || 'N/A'}</td>
-                        <td>$${slip.order_total}</td>
+                        <td>${slip.order_total} MMK</td>
                         <td>${new Date(slip.uploaded_at).toLocaleDateString()}</td>
                         <td>
                             <button onclick="verifyPaymentSlip('${slip.id}', true)">Verify</button>
@@ -963,7 +963,7 @@
                         <td>${order.customer_full_name || order.customer_email || 'N/A'}</td>
                         <td>${order.delivery_customer_full_name || 'N/A'}</td>
                         <td>${productsList}</td>
-                        <td>$${order.total_amount}</td>
+                        <td>${order.total_amount} MMK</td>
                         <td>${order.payment_method}</td>
                         <td>${deliveryAddress}</td>
                         <td>

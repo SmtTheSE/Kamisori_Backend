@@ -17,7 +17,7 @@ This is a secure, scalable e-commerce backend built with Supabase for a local cl
 3. Shopping cart with server-side calculation
 4. Immutable order snapshots
 5. Payment slip verification system
-6. Email notifications via Edge Functions
+6. Email notifications via Gmail SMTP (Edge Functions)
 7. **NEW: Comprehensive admin CRUD functions**
 8. Secure admin panel
 

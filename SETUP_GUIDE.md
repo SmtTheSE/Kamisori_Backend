@@ -51,7 +51,15 @@ For the Edge Functions, you'll need to set the following environment variables i
 
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Your service role key
-- `ADMIN_EMAIL` - Admin email for notifications
+- `ADMIN_EMAIL` - Your Gmail address (where notifications will be sent)
+- `SMTP_USER` - Your Gmail address (for sending)
+- `SMTP_PASSWORD` - Your 16-character Google App Password
+
+> [!TIP]
+> **How to get a Gmail App Password:**
+> 1. Enable **2-Step Verification** in your Google Account.
+> 2. Go to [App Passwords](https://myaccount.google.com/apppasswords).
+> 3. Create a new "Mail" password for "Kamisori Backend".
 
 ## Step 6: Deploy Edge Functions
 
@@ -186,3 +194,32 @@ You can check the database logs in your Supabase dashboard under Database → Lo
 3. Add additional security measures as needed
 4. Perform load testing
 5. Set up monitoring and alerting
+
+## Dashboard-Friendly Deployment (Alternative to Terminal)
+
+If you or your team prefer not to use the terminal for every update, you can set up **GitHub Actions**. This allows the functions to deploy automatically whenever you click a button on GitHub or push code.
+
+### Option A: GitHub Actions (Automated)
+
+1. Connect your repository to Supabase via the [Supabase Dashboard](https://supabase.com/dashboard/project/_/settings/integrations).
+2. Add your `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID` as GitHub Secrets.
+3. Use the `.github/workflows/deploy.yml` template to automate deployment.
+
+### Option B: Managing Secrets via Dashboard
+
+While the code itself needs to be deployed via CLI or GitHub, you can manage all **Secrets** (like Gmail passwords) manually without any terminal commands:
+
+1. Go to your **Supabase Dashboard**.
+2. Navigate to **Edge Functions** in the left sidebar.
+3. Select the function (e.g., `notify-admin`).
+4. Click on the **Settings** tab.
+5. Under **Environment Variables**, you can add, edit, or delete `SMTP_USER`, `SMTP_PASSWORD`, etc.
+6. Click **Save** to apply changes instantly.
+
+### Option C: Manual Testing via Dashboard
+
+You can test your functions directly from the dashboard:
+1. Go to **Edge Functions** -> **notify-admin**.
+2. Click the **Test** tab.
+3. Enter your JSON payload (e.g., `{"notification_type": "test_ping"}`).
+4. Click **Run**.

@@ -187,7 +187,7 @@
             <p id="emptyCartMessage">Your cart is empty</p>
             <div id="cartItems"></div>
             <div id="cartSummary" class="hidden">
-                <h3>Total: $<span id="cartTotal">0.00</span></h3>
+                <h3>Total: <span id="cartTotal">0.00</span> MMK</h3>
                 <div id="paymentOptions">
                     <h4>Payment Method:</h4>
                     <div>
@@ -670,7 +670,7 @@
                         ${carouselHtml}
                         <h3>${product.name}</h3>
                         <p>${product.description}</p>
-                        <p>Price: $${product.price}</p>
+                        <p>Price: ${product.price} MMK</p>
                         <p>Stock: ${product.stock || 'Out of stock'}</p>
                         ${variantsHtml}
                         ${product.is_preorder ? '<span style="color: orange;">Pre-order</span>' : ''}
@@ -868,7 +868,7 @@
                         <div>
                             <h4>${item.products.name}</h4>
                             ${variantsText}
-                            <p>Price: $${item.products.price}</p>
+                            <p>Price: ${item.products.price} MMK</p>
                         </div>
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <button onclick="updateQuantity('${item.id}', ${item.quantity - 1})">-</button>
@@ -938,7 +938,7 @@
                         <div style="display: flex; gap: 20px;">
                             <div>Total Customers: <strong>${metric.total_customers}</strong></div>
                             <div>Total Orders: <strong>${metric.total_orders}</strong></div>
-                            <div>Total Revenue: <strong>$${metric.total_revenue || 0}</strong></div>
+                            <div>Total Revenue: <strong>${metric.total_revenue || 0} MMK</strong></div>
                             <div>Pending Orders: <strong>${metric.pending_orders}</strong></div>
                             <div>Processing: <strong>${metric.processing_orders}</strong></div>
                         </div>
@@ -981,7 +981,7 @@
                         <td>${order.id.substring(0, 8)}...</td>
                         <td>${order.customer_full_name || order.customer_email || 'N/A'}</td>
                         <td>${productsList}</td>
-                        <td>$${order.total_amount}</td>
+                        <td>${order.total_amount} MMK</td>
                         <td>${order.payment_method}</td>
                         <td>${deliveryAddress}</td>
                         <td>
@@ -1014,7 +1014,7 @@
                     row.innerHTML = `
                         <td>${slip.order_id.substring(0, 8)}...</td>
                         <td>${slip.customer_name || slip.customer_email || 'N/A'}</td>
-                        <td>$${slip.order_total}</td>
+                        <td>${slip.order_total} MMK</td>
                         <td>${new Date(slip.uploaded_at).toLocaleDateString()}</td>
                         <td>
                             <button onclick="verifyPaymentSlip('${slip.id}', true)">Verify</button>
