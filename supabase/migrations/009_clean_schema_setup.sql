@@ -6,15 +6,21 @@
 create extension if not exists "uuid-ossp";
 create extension if not exists "moddatetime";
 
--- Create season enum for product categories
-create type season_enum as enum ('summer', 'fall', 'winter', 'spring');
+-- Create season enum for product categories (Idempotent)
+do $$ begin
+  create type season_enum as enum ('summer', 'fall', 'winter', 'spring');
+exception
+  when duplicate_object then null;
+end $$;
+
 
 -- User roles table for access control
-create table public.user_roles (
+create table if not exists public.user_roles (
   user_id uuid references auth.users(id) on delete cascade,
   role text check (role in ('admin', 'customer')) not null,
   primary key (user_id)
 );
+
 
 -- Function to check if current user is admin
 create or replace function is_admin()
@@ -27,7 +33,7 @@ returns boolean language sql stable as $$
 $$;
 
 -- Product categories table
-create table public.product_categories (
+create table if not exists public.product_categories (
   id uuid primary key default gen_random_uuid(),
   season season_enum not null,
   year int not null check (year >= 2024),
@@ -37,8 +43,9 @@ create table public.product_categories (
   unique (season, year)
 );
 
+
 -- Product categories label view
-create view public.product_category_labels as
+create or replace view public.product_category_labels as
 select
   id,
   initcap(season::text) || ' ' || year as label,
@@ -47,8 +54,9 @@ select
   is_active
 from public.product_categories;
 
+
 -- Products table
-create table public.products (
+create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   description text,
@@ -61,6 +69,7 @@ create table public.products (
   colors text[] default null,
   created_at timestamptz default now()
 );
+
 
 -- Product images table
 create table public.product_images (
@@ -109,7 +118,7 @@ where p.is_active = true
 group by c.user_id;
 
 -- Orders table
-create table public.orders (
+create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id),
   total_amount numeric(10,2) not null,
@@ -117,6 +126,7 @@ create table public.orders (
   status text not null,
   created_at timestamptz default now()
 );
+
 
 -- Order items table
 create table public.order_items (
@@ -130,7 +140,7 @@ create table public.order_items (
 );
 
 -- Delivery addresses table
-create table public.delivery_addresses (
+create table if not exists public.delivery_addresses (
   id uuid primary key default gen_random_uuid(),
   order_id uuid references public.orders(id) on delete cascade,
   full_name text not null,
@@ -138,6 +148,7 @@ create table public.delivery_addresses (
   address text not null,
   created_at timestamptz default now()
 );
+
 
 -- Payment slips table
 create table public.payment_slips (
@@ -159,13 +170,14 @@ create table public.customer_notifications (
   sent_at timestamptz default now()
 );
 
-create table public.payment_notifications (
+create table if not exists public.payment_notifications (
   id uuid primary key default gen_random_uuid(),
   order_id uuid references public.orders(id),
   notification_type text not null,
   message text not null,
   sent_at timestamptz default now()
 );
+
 
 -- Enable Row Level Security on all tables
 alter table public.user_roles enable row level security;

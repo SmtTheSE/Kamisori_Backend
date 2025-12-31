@@ -3,6 +3,7 @@
 -- and business metrics to support the admin panel
 
 -- Admin function to get all orders with customer details (for admin dashboard)
+drop function if exists get_all_orders_admin(int, int);
 create or replace function get_all_orders_admin(
   page_offset int default 0,
   page_limit int default 50
@@ -17,7 +18,8 @@ returns table (
   status text,
   created_at timestamptz,
   delivery_address jsonb,
-  order_items jsonb
+  order_items jsonb,
+  delivery_customer_full_name text
 )
 language sql
 security definer
@@ -26,7 +28,7 @@ as $$
     o.id,
     o.user_id,
     au.email as customer_email,
-    au.raw_user_meta_data->>'full_name' as customer_full_name,
+    coalesce(au.raw_user_meta_data->>'full_name', au.raw_user_meta_data->>'name') as customer_full_name,
     o.total_amount,
     o.payment_method,
     o.status,
@@ -57,7 +59,8 @@ as $$
       join public.products p on oi.product_id = p.id
       where oi.order_id = o.id), 
       '[]'::jsonb
-    ) as order_items
+    ) as order_items,
+    (select da.full_name from public.delivery_addresses da where da.order_id = o.id limit 1) as delivery_customer_full_name
   from public.orders o
   left join auth.users au on o.user_id = au.id
   order by o.created_at desc

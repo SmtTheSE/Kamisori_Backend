@@ -356,9 +356,29 @@ with check (is_admin());
 | product-images | Public read / Admin write |
 | payment-slips | Private / Admin read |
 
-## Email Verification (Trigger)
+## Email Notifications (Triggers)
 
 ```sql
+-- Trigger for new orders
+create or replace function notify_admin_new_order()
+returns trigger as $$
+begin
+  perform net.http_post(
+    url := 'https://PROJECT.functions.supabase.co/notify-admin',
+    body := json_build_object(
+      'order_id', NEW.id,
+      'notification_type', 'new_order'
+    )::text
+  );
+  return NEW;
+end;
+$$ language plpgsql;
+
+create trigger new_order_notification
+  after insert on public.orders
+  for each row execute function notify_admin_new_order();
+
+-- Trigger for payment slip uploads
 create or replace function notify_admin_payment()
 returns trigger as $$
 begin

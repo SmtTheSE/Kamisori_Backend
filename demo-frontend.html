@@ -201,25 +201,30 @@
                 </div>
                 <div id="kbzQRSection" class="hidden" style="text-align: center; margin-top: 15px;">
                     <h4>Scan QR Code to Pay with KBZ Pay</h4>
-                    <img id="kbzQRCode" src="" alt="KBZ Pay QR Code" style="width: 200px; height: 200px; margin: 10px auto;">
+                    <img id="kbzQRCode" src="" alt="KBZ Pay QR Code"
+                        style="width: 200px; height: 200px; margin: 10px auto;">
                     <p>Please make payment via KBZ Pay and upload your payment slip</p>
                     <input type="file" id="paymentSlipUpload" accept="image/*">
                     <button id="uploadPaymentSlipBtn">Upload Payment Slip</button>
                 </div>
-                <div id="deliveryAddressSection" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; display: none;">
+                <div id="deliveryAddressSection"
+                    style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; display: none;">
                     <h4>Delivery Address</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div>
                             <label for="fullName">Full Name:</label>
-                            <input type="text" id="fullName" placeholder="Full Name" required style="width: 100%; padding: 8px;">
+                            <input type="text" id="fullName" placeholder="Full Name" required
+                                style="width: 100%; padding: 8px;">
                         </div>
                         <div>
                             <label for="phone">Phone Number:</label>
-                            <input type="text" id="phone" placeholder="Phone Number" required style="width: 100%; padding: 8px;">
+                            <input type="text" id="phone" placeholder="Phone Number" required
+                                style="width: 100%; padding: 8px;">
                         </div>
                         <div style="grid-column: span 2;">
                             <label for="address">Delivery Address:</label>
-                            <textarea id="address" placeholder="Full Address" required style="width: 100%; padding: 8px; height: 80px;"></textarea>
+                            <textarea id="address" placeholder="Full Address" required
+                                style="width: 100%; padding: 8px; height: 80px;"></textarea>
                         </div>
                     </div>
                 </div>
@@ -326,14 +331,14 @@
         // Toggle payment options visibility
         function togglePaymentOptions() {
             const selectedPayment = document.querySelector('input[name="paymentMethod"]:checked').value;
-            
+
             if (selectedPayment === 'kbz_pay') {
                 kbzQRCode.src = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iMjAwcHgiIGhlaWdodD0iMjAwcHgiIHZpZXdCb3g9IjAgMCAyMDAgMjAwIiB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPgogICAgPGcgc3Ryb2tlPSJub25lIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiIGZpbGwtcnVsZT0iZXZlbm9kZCI+CiAgICAgICAgPHJlY3Qgc3Ryb2tlPSJub25lIiBmaWxsPSIjRjVGNUY1IiB4PSIwIiB5PSIwIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIvPgogICAgICAgIDxnIGZpbGw9IiMwMDAiPgogICAgICAgICAgICA8cGF0aCBkPSJNMTAwLDIwIEMxNDkuNzI1ODM0LDIwIDE5MCw2MC4yNzQxNjYzIDE5MCwxMTAgaDEwMCwxNTkuNzI1ODM0IDE0OS43MjU4MzQsMjAwIDEwMCwyMDAgQzUwLjI3NDE2NjMsMjAwIDEwLDE1OS43MjU4MzQgMTAsMTEwIEMxMCw2MC4yNzQxNjYzIDUwLjI3NDE2NjMsMjAgMTAwLDIwIFoiLz4KICAgICAgICAgICAgPHBhdGggZD0iTTEwMCw0MCBDMTI3LjYxNDE3OSw0MCAxNTAsNjIuMzg1ODIxIDE1MCw5MCBDMTUwLDExNy42MTQxNzkgMTI3LjYxNDE3OSwxNDAgMTAwLDE0MCBDNzIuMzg1ODIxLDE0MCA1MCwxMTcuNjE0MTc5IDUwLDkwIEM1MCw2Mi4zODU4MjEgNzIuMzg1ODIxLDQwIDEwMCw0MCBaIi8+CiAgICAgICAgICAgIDxwYXRoIGQ9Ik0xMDAsNjAgQzExNi41Njg1NDMsNjAgMTMwLDc0LjQzMTQ1NyAxMzAsOTAuNSBDMTMwLDEwNi41Njg1NDMgMTE2LjU2ODU0MywxMjEgMTAwLDEyMSBDODMuNDMxNDU3LDEyMSA3MCwxMDYuNTY4NTQzIDcwLDkwLjUgQzcwLDc0LjQzMTQ1NyA4My40MzE0NTcsNjAgMTAwLDYwIFoiLz4KICAgICAgICAgICAgPHBhdGggZD0iTTEwMCw4MCBDMTA1LjUyMjg0NywxMDAgOTQuNDc3MTUzLDEwMCAxMDAsODAgWiIvPgogICAgICAgIDwvZz4KICAgIDwvZz4KPC9zdmc+';
                 kbzQRSection.style.display = 'block';
             } else {
                 kbzQRSection.style.display = 'none';
             }
-            
+
             // Always show the delivery address section regardless of payment method
             deliveryAddressSection.style.display = 'block';
         }
@@ -343,16 +348,16 @@
             const fullName = fullNameInput.value.trim();
             const phone = phoneInput.value.trim();
             const address = addressInput.value.trim();
-            
+
             if (!fullName || !phone || !address) {
                 showStatus('Please fill in all delivery address fields', false);
                 return false;
             }
-            
+
             try {
                 console.log('Saving delivery address for order ID:', orderId);
-                console.log('Address details:', {orderId, fullName, phone, address});
-                
+                console.log('Address details:', { orderId, fullName, phone, address });
+
                 const { data, error } = await supabaseClient
                     .from('delivery_addresses')
                     .insert([{
@@ -361,13 +366,13 @@
                         phone: phone,
                         address: address
                     }]);
-                
+
                 if (error) {
                     console.error('Error saving delivery address:', error);
                     console.error('Error details:', error.details, error.hint);
                     throw error;
                 }
-                
+
                 console.log('Delivery address saved successfully for order ID:', orderId);
                 console.log('Saved data:', data);
                 return true;
@@ -387,7 +392,7 @@
             const fullName = fullNameInput.value.trim();
             const phone = phoneInput.value.trim();
             const address = addressInput.value.trim();
-            
+
             if (!fullName || !phone || !address) {
                 showStatus('Please fill in all delivery address fields', false);
                 return;
@@ -395,11 +400,14 @@
 
             try {
                 const selectedPayment = document.querySelector('input[name="paymentMethod"]:checked').value;
-                
+
                 console.log('Starting checkout with payment method:', selectedPayment);
-                
+
                 const { data: orderId, error } = await supabaseClient.rpc('checkout_cart', {
-                    p_payment_method: selectedPayment
+                    p_payment_method: selectedPayment,
+                    p_full_name: fullName,
+                    p_phone: phone,
+                    p_address: address
                 });
 
                 if (error) {
@@ -408,57 +416,31 @@
                 }
 
                 console.log('Order created successfully with ID:', orderId);
-                
-                // Save delivery address
-                const addressSaved = await saveDeliveryAddress(orderId);
-                
-                if (!addressSaved) {
-                    // If address save failed, show message but don't necessarily cancel order
-                    // since we already have the orderId
-                    showStatus('Warning: Failed to save delivery address.', false);
-                } else {
-                    // Verify the address was saved properly
-                    try {
-                        const { data: verifyAddress, error: verifyError } = await supabaseClient
-                            .from('delivery_addresses')
-                            .select('*')
-                            .eq('order_id', orderId)
-                            .single();
-                        
-                        if (verifyError) {
-                            console.error('Error verifying delivery address:', verifyError);
-                        } else {
-                            console.log('Verified delivery address exists for order:', orderId, verifyAddress);
-                        }
-                    } catch (verifyError) {
-                        console.error('Verification error:', verifyError);
-                    }
-                    
-                    showStatus(`Order placed successfully! Order ID: ${orderId}`);
-                }
-                
+                showStatus(`Order placed successfully! Order ID: ${orderId}`);
+
                 // Clear form inputs
                 fullNameInput.value = '';
                 phoneInput.value = '';
                 addressInput.value = '';
-                
+
                 // Hide delivery address section after successful checkout
                 deliveryAddressSection.style.display = 'none';
-                
+
                 loadCart(); // Refresh cart
-                
+
+
                 // If KBZ Pay was selected, show upload instructions and generate QR code
                 if (selectedPayment === 'kbz_pay') {
                     // Generate and show the QR code for this specific order
                     const totalAmount = parseFloat(document.getElementById('cartTotal').textContent);
-                    
+
                     // KBZ Pay QR code generator function
                     function generateKBZPayQRCode(orderId, amount) {
-                      // This is a simplified SVG representation of a QR code
-                      // In production, use a proper QR code library
-                      const paymentData = `KBZPAY:${orderId}:${amount}`;
-                      
-                      return `data:image/svg+xml;base64,${btoa(`
+                        // This is a simplified SVG representation of a QR code
+                        // In production, use a proper QR code library
+                        const paymentData = `KBZPAY:${orderId}:${amount}`;
+
+                        return `data:image/svg+xml;base64,${btoa(`
                         <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                           <rect width="200" height="200" fill="#ffffff"/>
                           <g fill="#000000">
@@ -481,22 +463,22 @@
 
                     // Helper function to generate random pattern for QR code
                     function generateRandomQRPattern() {
-                      let pattern = '';
-                      for (let i = 0; i < 50; i++) {
-                        const x = 20 + Math.floor(Math.random() * 160);
-                        const y = 20 + Math.floor(Math.random() * 160);
-                        const size = 5 + Math.floor(Math.random() * 10);
-                        
-                        // Avoid placing blocks in the alignment marker areas
-                        if (!((x < 60 && y < 60) || (x > 140 && y < 60) || (x < 60 && y > 140))) {
-                          pattern += `<rect x="${x}" y="${y}" width="${size}" height="${size}"/>`;
+                        let pattern = '';
+                        for (let i = 0; i < 50; i++) {
+                            const x = 20 + Math.floor(Math.random() * 160);
+                            const y = 20 + Math.floor(Math.random() * 160);
+                            const size = 5 + Math.floor(Math.random() * 10);
+
+                            // Avoid placing blocks in the alignment marker areas
+                            if (!((x < 60 && y < 60) || (x > 140 && y < 60) || (x < 60 && y > 140))) {
+                                pattern += `<rect x="${x}" y="${y}" width="${size}" height="${size}"/>`;
+                            }
                         }
-                      }
-                      return pattern;
+                        return pattern;
                     }
-                    
+
                     kbzQRCode.src = generateKBZPayQRCode(orderId, totalAmount);
-                    
+
                     showStatus('Order placed successfully! Please scan the QR code to pay with KBZ Pay, then upload your payment slip.');
                 } else {
                     showStatus('Order placed successfully! Our team will contact you for delivery arrangements.');
@@ -551,9 +533,9 @@
 
                 const { error: uploadError } = await supabaseClient.storage
                     .from('payment-slips')
-                    .upload(filePath, file, { 
+                    .upload(filePath, file, {
                         cacheControl: '3600',
-                        upsert: false 
+                        upsert: false
                     });
 
                 if (uploadError) throw uploadError;
@@ -570,7 +552,7 @@
 
                 showStatus('Payment slip uploaded successfully! Admin will verify shortly.');
                 paymentSlipUpload.value = '';
-                
+
             } catch (error) {
                 console.error('Error uploading payment slip:', error.message);
                 showStatus(`Error uploading payment slip: ${error.message}`, false);
@@ -986,7 +968,7 @@
                             return `${item.product_name}${variantInfo} x${item.quantity}`;
                         }).join('<br>');
                     }
-                    
+
                     // Format delivery address
                     let deliveryAddress = 'N/A';
                     console.log('Order delivery address data:', order.delivery_address); // Debug log
@@ -1139,12 +1121,12 @@
         });
 
         checkoutBtn.addEventListener('click', checkout);
-        
+
         // Payment method change listener
         document.querySelectorAll('input[name="paymentMethod"]').forEach((radio) => {
             radio.addEventListener('change', togglePaymentOptions);
         });
-        
+
         // Upload payment slip button
         uploadPaymentSlipBtn.addEventListener('click', uploadPaymentSlip);
 
@@ -1178,7 +1160,7 @@
                     adminSection.style.display = 'none';
                 }
             });
-            
+
             // Initialize payment options visibility
             togglePaymentOptions();
         });

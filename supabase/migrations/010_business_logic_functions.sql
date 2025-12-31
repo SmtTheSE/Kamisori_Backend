@@ -4,7 +4,10 @@
 
 -- Checkout function - processes cart and creates an order
 create or replace function public.checkout_cart(
-  p_payment_method text
+  p_payment_method text,
+  p_full_name text,
+  p_phone text,
+  p_address text
 )
 returns uuid
 language plpgsql
@@ -14,6 +17,7 @@ declare
   v_cart_id uuid;
   v_order_id uuid;
   v_total numeric;
+  v_user_email text;
 begin
   -- Get the user's cart
   select id into v_cart_id
@@ -60,6 +64,13 @@ begin
   join public.products p on p.id = ci.product_id
   where ci.cart_id = v_cart_id;
 
+  -- Save delivery address
+  insert into public.delivery_addresses (
+    order_id, full_name, phone, address
+  ) values (
+    v_order_id, p_full_name, p_phone, p_address
+  );
+
   -- Update stock for non-preorder items
   update public.products p
   set stock = stock - ci.quantity
@@ -68,12 +79,80 @@ begin
     and p.is_preorder = false
     and ci.cart_id = v_cart_id;
 
+  -- Get user email for notification logging
+  select email into v_user_email from auth.users where id = auth.uid();
+
   -- Clear the cart
   delete from public.cart_items where cart_id = v_cart_id;
 
   return v_order_id;
 end;
+
 $$;
+
+-- Function to notify admin of new order with complete information
+create table if not exists public.debug_triggers (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  message text,
+  payload jsonb
+);
+
+create or replace function notify_admin_new_order()
+returns trigger as $$
+declare
+  v_order_id uuid;
+  v_user_id uuid;
+  v_user_email text;
+  v_total_amount numeric;
+  v_payment_method text;
+  v_status text;
+  v_created_at timestamptz;
+begin
+  -- Resolve order ID based on which table triggered this
+  if (TG_TABLE_NAME = 'delivery_addresses') then
+    v_order_id := NEW.order_id;
+  else
+    v_order_id := NEW.id;
+  end if;
+
+  -- Get order details
+  select user_id, total_amount, payment_method, status, created_at
+  into v_user_id, v_total_amount, v_payment_method, v_status, v_created_at
+  from public.orders
+  where id = v_order_id;
+
+  -- Get user email from auth.users
+  select email into v_user_email
+  from auth.users
+  where id = v_user_id;
+  
+  -- DEBUG LOG
+  insert into public.debug_triggers (message, payload)
+  values ('Trigger firing', json_build_object('order_id', v_order_id, 'user_email', v_user_email));
+
+  -- Send notification with comprehensive order information
+  perform net.http_post(
+    url := 'https://ffsldhalkpxhzrhoukzh.functions.supabase.co/notify-admin',
+    body := json_build_object(
+      'order_id', v_order_id,
+      'notification_type', 'new_order',
+      'user_id', v_user_id,
+      'user_email', v_user_email,
+      'total_amount', v_total_amount,
+      'payment_method', v_payment_method,
+      'status', v_status,
+      'created_at', v_created_at
+    )::jsonb
+  );
+  return NEW;
+end;
+$$ language plpgsql;
+
+
+-- Explicitly drop the old premature trigger if it still exists
+drop trigger if exists new_order_notification on public.orders;
+
 
 -- Function to manage product categories (admin only)
 create or replace function admin_manage_category(

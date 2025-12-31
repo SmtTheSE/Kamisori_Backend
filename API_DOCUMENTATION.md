@@ -325,7 +325,6 @@ When a customer selects KBZ Pay as their payment method, the system generates a 
 // Example QR code data format
 const qrCodeData = `KBZPAY:${orderId}:${totalAmount}`;
 ```
-```
 
 ## Admin Functions
 
@@ -339,18 +338,6 @@ const { data: orders, error } = await supabase.rpc('get_all_orders_admin', {
   page_offset: 0,    // Page number (0-indexed)
   page_limit: 50     // Number of orders per page
 })
-
-// Each order includes:
-// - id: Order UUID
-// - user_id: Customer UUID
-// - customer_email: Customer email
-// - customer_full_name: Customer full name
-// - total_amount: Total order amount
-// - payment_method: Payment method (kbz_pay or cod)
-// - status: Current order status
-// - created_at: Order creation timestamp
-// - delivery_address: JSON object with full_name, phone, and address
-// - order_items: Array of items in the order with product details and variants
 ```
 
 ### Get Order Details (Admin Only)
@@ -361,6 +348,15 @@ const { data: orderDetails, error } = await supabase.rpc('get_order_details_admi
   order_uuid: orderId
 })
 ```
+
+### Notification System
+
+When customers place an order or upload payment slips, the system automatically notifies the admin via email:
+
+1. **New Order Notification**: Triggered when a customer completes checkout
+2. **Payment Slip Notification**: Triggered when a customer uploads a payment slip for KBZ Pay orders
+
+Both notifications include complete order details, customer information, and product list.
 
 ### Update Order Status (Admin Only)
 
@@ -535,4 +531,3 @@ if (error) {
 } else {
   // Process data
 }
-```
