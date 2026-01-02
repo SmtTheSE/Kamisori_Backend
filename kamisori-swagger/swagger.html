@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kamisori Backend API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+</head>
+
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+        const spec = {
+            "openapi": "3.0.0",
+            "info": {
+                "title": "Kamisori Backend API - Complete Developer Guide",
+                "version": "3.0.0",
+                "description": "## Complete API Documentation\n\nComprehensive API documentation for Kamisori E-Commerce Backend with proper HTTP methods and complete endpoint coverage.\n\n### Base URL\n```\nhttps://ffsldhalkpxhzrhoukzh.supabase.co\n```\n\n### Authentication\n- `apikey`: Supabase anonymous key (header)\n- `Authorization`: Bearer JWT token (header)"
+            },
+            "servers": [
+                { "url": "https://ffsldhalkpxhzrhoukzh.supabase.co/rest/v1", "description": "REST API" },
+                { "url": "https://ffsldhalkpxhzrhoukzh.supabase.co/auth/v1", "description": "Auth API" }
+            ],
+            "components": {
+                "securitySchemes": {
+                    "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "apikey" },
+                    "BearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+                }
+            },
+            "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+            "tags": [
+                { "name": "Authentication", "description": "User registration and session management" },
+                { "name": "Products (Public)", "description": "Browse products without authentication" },
+                { "name": "Shopping Cart", "description": "Cart management for authenticated users" },
+                { "name": "Checkout & Orders", "description": "Order placement and tracking" },
+                { "name": "Admin: Products", "description": "Product CRUD operations" },
+                { "name": "Admin: Categories", "description": "Category CRUD operations" },
+                { "name": "Admin: Orders", "description": "Order management and verification" },
+                { "name": "Admin: Analytics", "description": "Business metrics and reporting" }
+            ],
+            "paths": {
+                "/signup": {
+                    "post": {
+                        "tags": ["Authentication"],
+                        "summary": "User Registration",
+                        "servers": [{ "url": "https://ffsldhalkpxhzrhoukzh.supabase.co/auth/v1" }],
+                        "description": "Create a new user account.\n\n**Javascript**\n```javascript\nconst { data, error } = await supabase.auth.signUp({\n  email: 'user@example.com',\n  password: 'securePassword123'\n})\n```\n\n**Python**\n```python\nuser = supabase.auth.sign_up({\n  'email': 'user@example.com',\n  'password': 'securePassword123'\n})\n```",
+                        "responses": { "200": { "description": "User registered" } }
+                    }
+                },
+                "/token?grant_type=password": {
+                    "post": {
+                        "tags": ["Authentication"],
+                        "summary": "User Login",
+                        "servers": [{ "url": "https://ffsldhalkpxhzrhoukzh.supabase.co/auth/v1" }],
+                        "description": "Authenticate and receive JWT.\n\n**Javascript**\n```javascript\nconst { data, error } = await supabase.auth.signInWithPassword({\n  email: 'user@example.com',\n  password: 'securePassword123'\n})\n```",
+                        "responses": { "200": { "description": "Login successful" } }
+                    }
+                },
+                "/logout": {
+                    "post": {
+                        "tags": ["Authentication"],
+                        "summary": "User Logout",
+                        "servers": [{ "url": "https://ffsldhalkpxhzrhoukzh.supabase.co/auth/v1" }],
+                        "description": "**Javascript**\n```javascript\nawait supabase.auth.signOut()\n```",
+                        "responses": { "200": { "description": "Logged out" } }
+                    }
+                },
+                "/products": {
+                    "get": {
+                        "tags": ["Products (Public)"],
+                        "summary": "Get All Active Products",
+                        "description": "Retrieve products with optional category filter.\n\n**Javascript**\n```javascript\n// All products\nconst { data } = await supabase\n  .from('products')\n  .select('*')\n  .eq('is_active', true)\n\n// By category\nconst { data } = await supabase\n  .from('products')\n  .select('*')\n  .eq('category_id', categoryId)\n  .eq('is_active', true)\n```\n\n**cURL**\n```bash\ncurl 'https://ffsldhalkpxhzrhoukzh.supabase.co/rest/v1/products?is_active=eq.true' \\\n-H 'apikey: YOUR_KEY'\n```",
+                        "parameters": [
+                            { "name": "category_id", "in": "query", "schema": { "type": "string" } },
+                            { "name": "is_active", "in": "query", "schema": { "type": "boolean" } }
+                        ],
+                        "responses": { "200": { "description": "Product list" } }
+                    }
+                },
+                "/product_categories": {
+                    "get": {
+                        "tags": ["Products (Public)"],
+                        "summary": "Get All Categories",
+                        "description": "**Javascript**\n```javascript\nconst { data } = await supabase\n  .from('product_categories')\n  .select('*')\n  .eq('is_active', true)\n```",
+                        "responses": { "200": { "description": "Category list" } }
+                    }
+                },
+                "/carts": {
+                    "get": {
+                        "tags": ["Shopping Cart"],
+                        "summary": "Get User's Cart",
+                        "description": "Get authenticated user's cart with total calculation.\n\n**Javascript**\n```javascript\nconst { data: cart } = await supabase\n  .from('carts')\n  .select(`\n    *,\n    cart_items (\n      *,\n      products (*)\n    )\n  `)\n  .eq('user_id', user.id)\n  .single()\n\n// Calculate total\nconst total = cart.cart_items.reduce((sum, item) => \n  sum + (item.quantity * item.products.price), 0\n)\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Cart with items" } }
+                    }
+                },
+                "/cart_items": {
+                    "post": {
+                        "tags": ["Shopping Cart"],
+                        "summary": "Add Item to Cart",
+                        "description": "Add product with size/color variants.\n\n**Javascript**\n```javascript\nconst { data, error } = await supabase\n  .from('cart_items')\n  .insert({\n    cart_id: userCartId,\n    product_id: productId,\n    quantity: 2,\n    size: 'L',\n    color: 'Black'\n  })\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "201": { "description": "Item added" } }
+                    }
+                },
+                "/cart_items?id=eq.{id}": {
+                    "patch": {
+                        "tags": ["Shopping Cart"],
+                        "summary": "Update Cart Item Quantity",
+                        "description": "**Javascript**\n```javascript\nconst { data } = await supabase\n  .from('cart_items')\n  .update({ quantity: newQuantity })\n  .eq('id', itemId)\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Updated" } }
+                    },
+                    "delete": {
+                        "tags": ["Shopping Cart"],
+                        "summary": "Remove Cart Item",
+                        "description": "**Javascript**\n```javascript\nconst { error } = await supabase\n  .from('cart_items')\n  .delete()\n  .eq('id', itemId)\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "204": { "description": "Deleted" } }
+                    }
+                },
+                "/rpc/checkout_cart": {
+                    "post": {
+                        "tags": ["Checkout & Orders"],
+                        "summary": "Process Checkout",
+                        "description": "Convert cart to order. Creates immutable snapshot, reduces stock, clears cart.\n\n**Javascript**\n```javascript\nconst { data: orderId, error } = await supabase.rpc('checkout_cart', {\n  p_payment_method: 'kbz_pay',\n  p_full_name: 'John Doe',\n  p_phone: '+959123456789',\n  p_address: '123 Main St, Yangon'\n})\n```\n\n**Python**\n```python\nresponse = supabase.rpc('checkout_cart', {\n  'p_payment_method': 'kbz_pay',\n  'p_full_name': 'John Doe',\n  'p_phone': '+959123456789',\n  'p_address': '123 Main St, Yangon'\n}).execute()\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Returns order UUID" } }
+                    }
+                },
+                "/orders": {
+                    "get": {
+                        "tags": ["Checkout & Orders"],
+                        "summary": "Get Order History",
+                        "description": "**Javascript**\n```javascript\nconst { data: orders } = await supabase\n  .from('orders')\n  .select(`\n    *,\n    order_items (*, products(*)),\n    delivery_addresses(*)\n  `)\n  .order('created_at', { ascending: false })\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Order list" } }
+                    }
+                },
+                "/orders?id=eq.{id}": {
+                    "get": {
+                        "tags": ["Checkout & Orders"],
+                        "summary": "Get Order Details",
+                        "description": "Get detailed info for specific order.\n\n**Javascript**\n```javascript\nconst { data: order } = await supabase\n  .from('orders')\n  .select(`\n    *,\n    order_items (*, products(*)),\n    delivery_addresses(*),\n    payment_slips(*)\n  `)\n  .eq('id', orderId)\n  .single()\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Order details" } }
+                    }
+                },
+                "/payment_slips": {
+                    "post": {
+                        "tags": ["Checkout & Orders"],
+                        "summary": "Upload Payment Slip",
+                        "description": "Upload KBZ Pay screenshot.\n\n**Javascript**\n```javascript\n// 1. Upload to storage\nconst { data: uploadData } = await supabase.storage\n  .from('payment-slips')\n  .upload(`${orderId}.jpg`, file)\n\n// 2. Create record\nconst { data } = await supabase\n  .from('payment_slips')\n  .insert({\n    order_id: orderId,\n    image_url: uploadData.path\n  })\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "201": { "description": "Uploaded" } }
+                    }
+                },
+                "/rpc/admin_manage_product": {
+                    "post": {
+                        "tags": ["Admin: Products"],
+                        "summary": "Create or Update Product",
+                        "description": "Comprehensive product management. Omit `product_uuid` to create new.\n\n**Javascript**\n```javascript\n// Create\nconst { data: productId } = await supabase.rpc('admin_manage_product', {\n  product_name: 'Summer Tee',\n  product_description: 'Lightweight',\n  product_price: 25000,\n  product_stock: 50,\n  product_is_preorder: false,\n  product_is_active: true,\n  category_uuid: categoryId,\n  product_sizes: ['S', 'M', 'L'],\n  product_colors: ['Black', 'White']\n})\n\n// Update\nawait supabase.rpc('admin_manage_product', {\n  product_uuid: productId,\n  product_price: 22000\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Product UUID" } }
+                    }
+                },
+                "/rpc/admin_delete_product": {
+                    "delete": {
+                        "tags": ["Admin: Products"],
+                        "summary": "Delete Product",
+                        "description": "⚠️ **DESTRUCTIVE** - Permanently deletes product and images.\n\n**Javascript**\n```javascript\nconst { error } = await supabase.rpc('admin_delete_product', {\n  product_uuid: productId\n})\n```\n\n> Note: This is an RPC function called via POST in Supabase, but documented as DELETE for clarity.",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Deleted" } }
+                    }
+                },
+                "/rpc/admin_toggle_active_status": {
+                    "patch": {
+                        "tags": ["Admin: Products", "Admin: Categories"],
+                        "summary": "Toggle Active Status",
+                        "description": "Activate/deactivate products or categories.\n\n**Javascript**\n```javascript\n// Toggle product\nawait supabase.rpc('admin_toggle_active_status', {\n  table_name: 'products',\n  record_uuid: productId,\n  active_status: false\n})\n\n// Toggle category\nawait supabase.rpc('admin_toggle_active_status', {\n  table_name: 'product_categories',\n  record_uuid: categoryId,\n  active_status: true\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Updated" } }
+                    }
+                },
+                "/rpc/admin_manage_category": {
+                    "post": {
+                        "tags": ["Admin: Categories"],
+                        "summary": "Create or Update Category",
+                        "description": "**Javascript**\n```javascript\n// Create\nconst { data: categoryId } = await supabase.rpc('admin_manage_category', {\n  category_season: 'summer',\n  category_year: 2024\n})\n\n// Update\nawait supabase.rpc('admin_manage_category', {\n  category_uuid: categoryId,\n  category_year: 2025\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Category UUID" } }
+                    }
+                },
+                "/rpc/admin_delete_category": {
+                    "delete": {
+                        "tags": ["Admin: Categories"],
+                        "summary": "Delete Category",
+                        "description": "⚠️ **CASCADE DELETE** - Removes category and ALL products.\n\n**Javascript**\n```javascript\nawait supabase.rpc('admin_delete_category', {\n  category_uuid: categoryId\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Deleted" } }
+                    }
+                },
+                "/rpc/get_all_orders_admin": {
+                    "get": {
+                        "tags": ["Admin: Orders"],
+                        "summary": "Get All Orders (Paginated)",
+                        "description": "Full order list with customer details.\n\n**Javascript**\n```javascript\nconst { data: orders } = await supabase.rpc('get_all_orders_admin', {\n  page_offset: 0,\n  page_limit: 50\n})\n```",
+                        "parameters": [
+                            { "name": "page_offset", "in": "query", "schema": { "type": "integer", "default": 0 } },
+                            { "name": "page_limit", "in": "query", "schema": { "type": "integer", "default": 50 } }
+                        ],
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Order list" } }
+                    }
+                },
+                "/rpc/get_order_details_admin": {
+                    "get": {
+                        "tags": ["Admin: Orders"],
+                        "summary": "Get Deep Order Details",
+                        "description": "Complete order breakdown.\n\n**Javascript**\n```javascript\nconst { data: order } = await supabase.rpc('get_order_details_admin', {\n  order_uuid: orderId\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Order details" } }
+                    }
+                },
+                "/rpc/admin_update_order_status": {
+                    "patch": {
+                        "tags": ["Admin: Orders"],
+                        "summary": "Update Order Status",
+                        "description": "Move order through lifecycle. Triggers customer notification.\n\n**Javascript**\n```javascript\nawait supabase.rpc('admin_update_order_status', {\n  order_uuid: orderId,\n  new_status: 'shipped'\n})\n\n// Valid: pending_payment, paid, confirmed, shipped, delivered, cancelled\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Updated" } }
+                    }
+                },
+                "/rpc/get_unverified_payment_slips": {
+                    "get": {
+                        "tags": ["Admin: Orders"],
+                        "summary": "Get Unverified Payment Slips",
+                        "description": "List slips awaiting approval.\n\n**Javascript**\n```javascript\nconst { data: slips } = await supabase.rpc('get_unverified_payment_slips')\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Slip list" } }
+                    }
+                },
+                "/rpc/admin_verify_payment_slip": {
+                    "patch": {
+                        "tags": ["Admin: Orders"],
+                        "summary": "Verify Payment Slip",
+                        "description": "Mark as verified. Auto-updates order to 'paid'.\n\n**Javascript**\n```javascript\nawait supabase.rpc('admin_verify_payment_slip', {\n  slip_uuid: slipId,\n  verified_status: true\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Verified" } }
+                    }
+                },
+                "/rpc/admin_delete_order": {
+                    "delete": {
+                        "tags": ["Admin: Orders"],
+                        "summary": "Delete Order",
+                        "description": "⚠️ **DESTRUCTIVE** - Complete removal of order and logs.\n\n**Javascript**\n```javascript\nawait supabase.rpc('admin_delete_order', {\n  order_uuid: orderId\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Deleted" } }
+                    }
+                },
+                "/rpc/get_business_metrics": {
+                    "get": {
+                        "tags": ["Admin: Analytics"],
+                        "summary": "Get Business Metrics",
+                        "description": "Revenue and performance snapshot.\n\n**Javascript**\n```javascript\nconst { data: metrics } = await supabase.rpc('get_business_metrics')\n// Returns: total_customers, total_orders, total_revenue, etc.\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Metrics" } }
+                    }
+                },
+                "/rpc/admin_cleanup_old_orders": {
+                    "delete": {
+                        "tags": ["Admin: Analytics"],
+                        "summary": "Bulk Delete Old Orders",
+                        "description": "⚠️ **BULK DELETE** - Database maintenance.\n\n**Javascript**\n```javascript\nconst { data: result } = await supabase.rpc('admin_cleanup_old_orders', {\n  older_than_date: '2023-01-01T00:00:00Z'\n})\n// Returns deletion counts\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Counts" } }
+                    }
+                },
+                "/rpc/admin_count_old_orders": {
+                    "get": {
+                        "tags": ["Admin: Analytics"],
+                        "summary": "Preview Cleanup Impact",
+                        "description": "Check before bulk delete.\n\n**Javascript**\n```javascript\nconst { data: counts } = await supabase.rpc('admin_count_old_orders', {\n  older_than_date: '2023-01-01T00:00:00Z'\n})\n```",
+                        "security": [{ "ApiKeyAuth": [], "BearerAuth": [] }],
+                        "responses": { "200": { "description": "Impact estimate" } }
+                    }
+                }
+            }
+        };
+
+        const ui = SwaggerUIBundle({
+            spec: spec,
+            dom_id: '#swagger-ui',
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            layout: "BaseLayout",
+            deepLinking: true,
+            operationsSorter: "alpha",
+            defaultModelsExpandDepth: -1,
+            docExpansion: 'list',
+            tryItOutEnabled: true
+        });
+    </script>
+</body>
+
+</html>

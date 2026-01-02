@@ -1,0 +1,232 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Kamisori Backend API",
+        "description": "Exhaustive API Documentation for Kamisori Backend system, covering database interactions and RPC functions.",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "https://ffsldhalkpxhzrhoukzh.supabase.co/rest/v1",
+            "description": "Supabase REST API"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "supabaseAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "Enter your JWT token with the prefix 'Bearer '"
+            },
+            "supabaseAnonKey": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "apikey",
+                "description": "Enter your Supabase Anonymous Key"
+            }
+        }
+    },
+    "security": [
+        {
+            "supabaseAnonKey": [],
+            "supabaseAuth": []
+        }
+    ],
+    "paths": {
+        "/rpc/checkout_cart": {
+            "post": {
+                "summary": "Checkout Cart",
+                "description": "Converts cart to order, reduces stock, clears cart, and saves delivery address.",
+                "tags": [
+                    "Customer"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "p_payment_method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "kbz_pay",
+                                            "cod"
+                                        ]
+                                    },
+                                    "p_full_name": {
+                                        "type": "string"
+                                    },
+                                    "p_phone": {
+                                        "type": "string"
+                                    },
+                                    "p_address": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "p_payment_method",
+                                    "p_full_name",
+                                    "p_phone",
+                                    "p_address"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Order ID (UUID) returned"
+                    }
+                }
+            }
+        },
+        "/rpc/get_all_orders_admin": {
+            "post": {
+                "summary": "Get All Orders (Admin)",
+                "description": "Returns a detailed list of all orders. Admin only.",
+                "tags": [
+                    "Admin"
+                ],
+                "parameters": [
+                    {
+                        "name": "page_offset",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of orders"
+                    }
+                }
+            }
+        },
+        "/rpc/admin_update_order_status": {
+            "post": {
+                "summary": "Update Order Status (Admin)",
+                "description": "Updates the status of a specific order.",
+                "tags": [
+                    "Admin"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "order_uuid": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "new_status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "pending_payment",
+                                            "pending_confirmation",
+                                            "paid",
+                                            "confirmed",
+                                            "shipped",
+                                            "delivered",
+                                            "cancelled"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "order_uuid",
+                                    "new_status"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status updated"
+                    }
+                }
+            }
+        },
+        "/rpc/admin_verify_payment_slip": {
+            "post": {
+                "summary": "Verify Payment Slip (Admin)",
+                "description": "Verifies a payment slip and updates order status to 'paid'.",
+                "tags": [
+                    "Admin"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "slip_uuid": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "verified_status": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "slip_uuid",
+                                    "verified_status"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Payment slip verified"
+                    }
+                }
+            }
+        },
+        "/rpc/admin_delete_product": {
+            "post": {
+                "summary": "Delete Product (Admin)",
+                "description": "Safely deletes a product and its images.",
+                "tags": [
+                    "Admin"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "product_uuid": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "required": [
+                                    "product_uuid"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Product deleted"
+                    }
+                }
+            }
+        }
+    }
+}
