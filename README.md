@@ -87,6 +87,22 @@ create table public.products (
   is_preorder boolean default false,
   is_active boolean default true,
   category_id uuid references public.product_categories(id),
+  sizes text[] default null,
+  colors text[] default null,
+  created_at timestamptz default now()
+);
+```
+
+### Product Images
+
+```sql
+create table public.product_images (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.products(id) on delete cascade,
+  image_url text not null,
+  alt_text text,
+  is_primary boolean default false,
+  sort_order int default 0,
   created_at timestamptz default now()
 );
 ```
@@ -114,7 +130,9 @@ create table public.cart_items (
   cart_id uuid references public.carts(id) on delete cascade,
   product_id uuid references public.products(id),
   quantity int not null check (quantity > 0),
-  unique (cart_id, product_id)
+  size text default null,
+  color text default null,
+  unique (cart_id, product_id, coalesce(size, ''), coalesce(color, ''))
 );
 ```
 
@@ -152,7 +170,9 @@ create table public.order_items (
   order_id uuid references public.orders(id) on delete cascade,
   product_id uuid references public.products(id),
   quantity int not null,
-  price numeric(10,2) not null
+  price numeric(10,2) not null,
+  size text default null,
+  color text default null
 );
 ```
 
@@ -201,7 +221,10 @@ $$;
 
 ```sql
 create or replace function public.checkout_cart(
-  p_payment_method text
+  p_payment_method text,
+  p_full_name text,
+  p_phone text,
+  p_address text
 )
 returns uuid
 language plpgsql
@@ -262,6 +285,14 @@ begin
 end;
 $$;
 ```
+
+### Admin: Delete and Cleanup Functions
+
+- `admin_delete_product(product_uuid)` - Safely delete product and its images.
+- `admin_delete_category(category_uuid)` - Delete category and all its products (cascade).
+- `admin_delete_order(order_uuid)` - Completely remove an order and all related notifications/slips.
+- `admin_cleanup_old_orders(older_than_date)` - Bulk delete orders older than a specific date for storage management.
+- `admin_count_old_orders(older_than_date)` - Preview how many orders will be affected by cleanup.
 
 ## NEW: Admin CRUD Functions
 
@@ -420,159 +451,196 @@ for each row execute function notify_admin_payment();
 - `auth.signIn()` - User login
 - `auth.signOut()` - User logout
 
-### Product Management
+### Product & Category Discovery (Public)
 
 - `GET /products` - Get all active products
 - `GET /products?category=categoryId` - Get products by category
 - `GET /product_categories` - Get all active product categories
 
-### Cart Management
+### Shopping Cart (Customer)
 
-- `GET /cart` - Get user's cart
-- `POST /cart/items` - Add item to cart
-- `PUT /cart/items/{id}` - Update cart item quantity
-- `DELETE /cart/items/{id}` - Remove item from cart
-- `GET /cart/total` - Get cart total
+- `GET /cart` - Get user's cart (calculates total server-side)
+- `POST /cart/items` - Add item to cart (with size/color support)
+- `PUT /cart/items/{id}` - Update quantity
+- `DELETE /cart/items/{id}` - Remove item
+- `GET /cart/total` - Get current cart total amount
 
-### Checkout
+### Checkout & Orders (Customer)
 
-- `POST /checkout` - Process checkout (with payment method)
+- `POST /checkout` - Process checkout (creates immutable order snapshot)
+- `GET /orders` - Get history of user's orders
+- `GET /orders/{id}` - Get detailed order info and status
+- `POST /payment_slips` - Upload KBZ Pay verification slip
 
-### Orders
+### Admin Panel (RPC Functions)
 
-- `GET /orders` - Get user's orders
-- `GET /orders/{id}` - Get specific order details
+All admin functions require the `admin` role and are protected by RLS and manual role checks.
 
-### Payment
+####  Product Management (CRUD)
+- `admin_manage_product(...)` - Comprehensive function to **Create or Update** products (names, prices, stock, variants, categories).
+- `admin_delete_product(product_uuid)` - Safely **Delete** a product and its associated images.
+- `admin_toggle_active_status('products', uuid, bool)` - Quickly activate/deactivate products.
 
-- `POST /payment_slips` - Upload payment slip for KBZ Pay
-- `GET /payment_slips/{orderId}` - Get payment slip for order (admin only)
+####  Category Management (CRUD)
+- `admin_manage_category(...)` - **Create or Update** seasonal categories.
+- `admin_delete_category(category_uuid)` - **Delete** category and all its products (cascade).
+- `admin_toggle_active_status('product_categories', uuid, bool)` - Quickly activate/deactivate categories.
 
-### Admin Functions
+####  Order & Payment Management
+- `get_all_orders_admin(offset, limit)` - Full paginated list of all orders with customer details.
+- `get_order_details_admin(order_uuid)` - Deep dive into a single order's items and address.
+- `admin_update_order_status(order_uuid, status)` - Move orders through the lifecycle (paid, confirmed, shipped, etc).
+- `get_unverified_payment_slips()` - List of KBZ Pay slips awaiting manual approval.
+- `admin_verify_payment_slip(slip_uuid, bool)` - Mark a payment as verified (automatically updates order to `paid`).
+- `admin_delete_order(order_uuid)` - Completely remove an order and its logs.
 
-- `RPC get_all_orders_admin` - Get all orders with customer details (admin only), including delivery address and product variants
-- `RPC get_order_details_admin` - Get detailed order information (admin only)
-- `RPC admin_update_order_status` - Update order status (admin only)
-- `RPC admin_verify_payment_slip` - Verify payment slip (admin only)
-- `RPC admin_manage_product` - Create/update products (admin only)
-- `RPC admin_manage_category` - Create/update categories (admin only)
-- `RPC admin_toggle_active_status` - Activate/deactivate items (admin only)
-- `RPC get_unverified_payment_slips` - Get unverified payment slips (admin only)
-- `RPC get_business_metrics` - Get business metrics (admin only)
+####  Reporting & Maintenance
+- `get_business_metrics()` - Quick snapshot of total revenue, orders, and customer counts.
+- `admin_cleanup_old_orders(date)` - Bulk delete legacy orders to manage database storage.
+- `admin_count_old_orders(date)` - Preview tool for the cleanup process.
 
-## Frontend Integration Guide
+## React/TypeScript Integration Guide
 
-### Getting Products
+This guide is for **Zwe Lin Naing** and **Thu Htet Naing** to integrate the backend with the React/TypeScript frontend.
 
-```javascript
-// Get all active products
-const { data: products, error } = await supabase
-  .from('products')
-  .select('*')
-  .eq('is_active', true);
+### 1. Setup Supabase Client
 
-// Get products by category
-const { data: products, error } = await supabase
-  .from('products')
-  .select('*')
-  .eq('is_active', true)
-  .eq('category_id', categoryId);
+```typescript
+import { createClient } from '@supabase/supabase-js';
+
+// Use environment variables for security
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 ```
 
-### Managing Cart
+### 2. Product Integration (with Images and Variants)
 
-```javascript
-// Add item to cart
-async function addToCart(productId, quantity) {
-  // First get user's cart or create one
-  let { data: cart, error } = await supabase
-    .from('carts')
-    .select('id')
-    .eq('user_id', supabase.auth.user().id)
-    .single();
-  
-  if (!cart) {
-    const { data, error } = await supabase
-      .from('carts')
-      .insert([{ user_id: supabase.auth.user().id }])
-      .select('id')
-      .single();
-    cart = data;
+When fetching products, you can include primary images and categories in a single call.
+
+```typescript
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  sizes: string[] | null;
+  colors: string[] | null;
+  product_images: { image_url: string; is_primary: boolean }[];
+}
+
+export async function fetchProducts(categoryId?: string) {
+  let query = supabase
+    .from('products')
+    .select(`
+      *,
+      product_images (image_url, is_primary)
+    `)
+    .eq('is_active', true);
+
+  if (categoryId) {
+    query = query.eq('category_id', categoryId);
   }
-  
-  // Add item to cart
+
+  const { data, error } = await query;
+  return { products: data as Product[], error };
+}
+```
+
+### 3. Cart Management (with Variants)
+
+When adding to cart, you **must** specify `size` and `color` if the product has them.
+
+```typescript
+export async function addToCart(productId: string, quantity: number, size?: string, color?: string) {
+  // 1. Get or create cart ID (see utils/supabase-helpers.ts)
+  const cartId = await getOrCreateCartId(); 
+
   const { error } = await supabase
     .from('cart_items')
     .insert([{ 
-      cart_id: cart.id, 
+      cart_id: cartId, 
       product_id: productId, 
-      quantity: quantity 
+      quantity, 
+      size: size || null, 
+      color: color || null 
     }]);
+
+  if (error && error.code === '23505') {
+    // Unique violation: update existing item quantity instead
+    // Implementation in utils/supabase-helpers.ts
+  }
 }
-
-// Get cart items with product details
-const { data: cartItems, error } = await supabase
-  .from('cart_items')
-  .select(`
-    id,
-    quantity,
-    products!inner (
-      id,
-      name,
-      price,
-      description
-    )
-  `)
-  .eq('carts.user_id', supabase.auth.user().id);
 ```
 
-### Processing Checkout
+### 4. Checkout and Delivery
 
-```javascript
-// Process checkout
-const orderId = await supabase.rpc('checkout_cart', {
-  p_payment_method: 'kbz_pay' // or 'cod'
+Checkout requires the delivery address upfront.
+
+```typescript
+export async function handleCheckout(paymentMethod: 'kbz_pay' | 'cod', addressData: any) {
+  const { data: orderId, error } = await supabase.rpc('checkout_cart', {
+    p_payment_method: paymentMethod,
+    p_full_name: addressData.fullName,
+    p_phone: addressData.phone,
+    p_address: addressData.address
+  });
+
+  if (error) throw error;
+  return orderId;
+}
+```
+
+### 5. KBZ Pay Payment Flow
+
+If `kbz_pay` is chosen:
+1. Show the QR Code (generated using `KBZPAY:${orderId}:${totalAmount}`).
+2. User uploads payment slip.
+
+```typescript
+export async function uploadSlip(orderId: string, file: File) {
+  // 1. Upload to storage
+  const filePath = `receipts/${orderId}_${Date.now()}`;
+  const { data, error: uploadError } = await supabase.storage
+    .from('payment-slips')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  // 2. Get public URL and save to DB
+  const { data: { publicUrl } } = supabase.storage.from('payment-slips').getPublicUrl(data.path);
+
+  const { error: dbError } = await supabase
+    .from('payment_slips')
+    .insert([{ order_id: orderId, image_url: publicUrl }]);
+
+  if (dbError) throw dbError;
+}
+```
+
+### 6. Admin Panel Hooks
+
+Admins can use RPC functions for high-level tasks.
+
+```typescript
+// Update order status
+await supabase.rpc('admin_update_order_status', {
+  order_uuid: '...',
+  new_status: 'paid' // paid, confirmed, shipped, etc.
 });
-```
 
-### Getting Cart Total
+// Verify payment
+await adminVerifyPayment('slip-uuid', true);
 
-```javascript
-// Get cart total
-const { data: cartTotal, error } = await supabase
-  .from('cart_totals')
-  .select('total_amount')
-  .eq('user_id', supabase.auth.user().id)
-  .single();
-```
+// Delete product
+await adminDeleteProduct('product-uuid');
 
-### Getting User Orders
+// Delete category
+await adminDeleteCategory('category-uuid');
 
-```javascript
-// Get user's orders
-const { data: orders, error } = await supabase
-  .from('orders')
-  .select(`
-    id,
-    total_amount,
-    payment_method,
-    status,
-    created_at,
-    order_items (
-      quantity,
-      price,
-      products (
-        name
-      )
-    ),
-    delivery_addresses (
-      full_name,
-      phone,
-      address
-    )
-  `)
-  .eq('user_id', supabase.auth.user().id)
-  .order('created_at', { ascending: false });
+// Delete order
+await adminDeleteOrder('order-uuid');
 ```
 
 ## Security Considerations

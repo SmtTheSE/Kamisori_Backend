@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -7,346 +7,213 @@ const supabase = createClient(
 );
 
 /**
- * Gets the current user's cart or creates one if it doesn't exist
+ * Gets the current user ID safely
  */
-export async function getOrCreateCart() {
-  // First try to get existing cart
+async function getCurrentUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  return user.id;
+}
+
+/**
+ * Gets the current user's cart ID or creates one if it doesn't exist
+ */
+export async function getOrCreateCartId() {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Authentication required');
+
   const { data: existingCart, error: cartError } = await supabase
     .from('carts')
     .select('id')
-    .eq('user_id', supabase.auth.currentSession?.user.id)
+    .eq('user_id', userId)
     .single();
 
-  if (cartError && cartError.code !== 'DATA_RETURNED_NO_ROWS') {
+  if (cartError && cartError.code !== 'PGRST116') { // PGRST116 is no rows
     throw new Error(`Error fetching cart: ${cartError.message}`);
   }
 
-  if (existingCart) {
-    return existingCart.id;
-  }
+  if (existingCart) return existingCart.id;
 
-  // Create a new cart if one doesn't exist
   const { data: newCart, error: createError } = await supabase
     .from('carts')
-    .insert([{ user_id: supabase.auth.currentSession?.user.id }])
+    .insert([{ user_id: userId }])
     .select('id')
     .single();
 
-  if (createError) {
-    throw new Error(`Error creating cart: ${createError.message}`);
-  }
-
+  if (createError) throw new Error(`Error creating cart: ${createError.message}`);
   return newCart.id;
 }
 
 /**
- * Adds an item to the user's cart
+ * Adds an item to the user's cart (with variant support)
  */
-export async function addToCart(productId: string, quantity: number) {
-  const cartId = await getOrCreateCart();
-  
+export async function addToCart(productId: string, quantity: number, size?: string, color?: string) {
+  const cartId = await getOrCreateCartId();
+
   const { error } = await supabase
     .from('cart_items')
-    .insert([{ 
-      cart_id: cartId, 
-      product_id: productId, 
-      quantity: quantity 
+    .insert([{
+      cart_id: cartId,
+      product_id: productId,
+      quantity,
+      size: size || null,
+      color: color || null
     }]);
 
   if (error) {
-    if (error.code === '23505') { // Unique violation - item already in cart
-      // Update quantity instead
-      return await updateCartItemQuantityByProductId(productId, quantity);
-    } else {
-      throw new Error(`Error adding to cart: ${error.message}`);
+    if (error.code === '23505') { // Unique violation
+      return await updateCartItemQuantityVariant(cartId, productId, quantity, size, color);
     }
+    throw new Error(`Error adding to cart: ${error.message}`);
   }
 }
 
 /**
- * Updates the quantity of a cart item
+ * Updates cart item quantity specifically for variants
  */
-export async function updateCartItemQuantity(cartItemId: string, newQuantity: number) {
-  if (newQuantity <= 0) {
-    return await removeCartItem(cartItemId);
-  }
-  
-  const { error } = await supabase
-    .from('cart_items')
-    .update({ quantity: newQuantity })
-    .eq('id', cartItemId);
-
-  if (error) {
-    throw new Error(`Error updating cart item: ${error.message}`);
-  }
-}
-
-/**
- * Updates the quantity of a cart item by product ID
- */
-export async function updateCartItemQuantityByProductId(productId: string, additionalQuantity: number) {
-  const { data: cartItem, error } = await supabase
+async function updateCartItemQuantityVariant(cartId: string, productId: string, additionalQty: number, size?: string, color?: string) {
+  const { data, error } = await supabase
     .from('cart_items')
     .select('id, quantity')
+    .eq('cart_id', cartId)
     .eq('product_id', productId)
-    .eq('carts.user_id', supabase.auth.currentSession?.user.id)
+    .eq('size', size || null)
+    .eq('color', color || null)
     .single();
 
-  if (error) {
-    throw new Error(`Error fetching cart item: ${error.message}`);
-  }
+  if (error) throw error;
 
-  const newQuantity = cartItem.quantity + additionalQuantity;
-  if (newQuantity <= 0) {
-    return await removeCartItem(cartItem.id);
-  }
-  
-  const { error: updateError } = await supabase
+  return await supabase
     .from('cart_items')
-    .update({ quantity: newQuantity })
-    .eq('id', cartItem.id);
-
-  if (updateError) {
-    throw new Error(`Error updating cart item: ${updateError.message}`);
-  }
+    .update({ quantity: data.quantity + additionalQty })
+    .eq('id', data.id);
 }
 
 /**
- * Removes an item from the cart
- */
-export async function removeCartItem(cartItemId: string) {
-  const { error } = await supabase
-    .from('cart_items')
-    .delete()
-    .eq('id', cartItemId);
-
-  if (error) {
-    throw new Error(`Error removing cart item: ${error.message}`);
-  }
-}
-
-/**
- * Gets all items in the current user's cart
+ * Gets all cart items with product details and images
  */
 export async function getCartItems() {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Authentication required');
+
   const { data, error } = await supabase
     .from('cart_items')
     .select(`
       id,
       quantity,
-      product_id,
+      size,
+      color,
       products!inner (
         id,
         name,
         price,
         description,
         stock,
-        is_preorder
+        is_preorder,
+        sizes,
+        colors,
+        product_images (image_url, is_primary)
       )
     `)
-    .eq('carts.user_id', supabase.auth.currentSession?.user.id);
+    .eq('carts.user_id', userId);
 
-  if (error) {
-    throw new Error(`Error fetching cart items: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Error fetching cart items: ${error.message}`);
   return data;
 }
 
 /**
- * Gets the total amount for the current user's cart
+ * Processes checkout (requires delivery details)
  */
-export async function getCartTotal() {
-  const { data, error } = await supabase
-    .from('cart_totals')
-    .select('total_amount')
-    .eq('user_id', supabase.auth.currentSession?.user.id)
-    .single();
-
-  if (error && error.code !== 'DATA_RETURNED_NO_ROWS') {
-    throw new Error(`Error fetching cart total: ${error.message}`);
-  }
-
-  return data?.total_amount || 0;
-}
-
-/**
- * Processes checkout and creates an order
- */
-export async function processCheckout(paymentMethod: 'kbz_pay' | 'cod') {
+export async function processCheckout(
+  paymentMethod: 'kbz_pay' | 'cod',
+  fullName: string,
+  phone: string,
+  address: string
+) {
   const { data, error } = await supabase.rpc('checkout_cart', {
-    p_payment_method: paymentMethod
+    p_payment_method: paymentMethod,
+    p_full_name: fullName,
+    p_phone: phone,
+    p_address: address
   });
 
-  if (error) {
-    throw new Error(`Error processing checkout: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Checkout error: ${error.message}`);
   return data;
 }
 
 /**
- * Uploads a payment slip for KBZ Pay
+ * Uploads payment slip for KBZ Pay
  */
 export async function uploadPaymentSlip(orderId: string, file: File) {
-  // Upload file to storage
-  const { data, error: uploadError } = await supabase
-    .storage
+  const filePath = `receipts/${orderId}_${Date.now()}`;
+  const { data, error: uploadError } = await supabase.storage
     .from('payment-slips')
-    .upload(`receipt_${orderId}_${Date.now()}`, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
+    .upload(filePath, file);
 
-  if (uploadError) {
-    throw new Error(`Error uploading payment slip: ${uploadError.message}`);
-  }
+  if (uploadError) throw new Error(`Upload error: ${uploadError.message}`);
 
-  // Get public URL
-  const { data: publicUrlData } = supabase
-    .storage
-    .from('payment-slips')
-    .getPublicUrl(data.path);
+  const { data: { publicUrl } } = supabase.storage.from('payment-slips').getPublicUrl(data.path);
 
-  // Save URL to payment_slips table
   const { error: dbError } = await supabase
     .from('payment_slips')
-    .insert([{
-      order_id: orderId,
-      image_url: publicUrlData.publicUrl
-    }]);
+    .insert([{ order_id: orderId, image_url: publicUrl }]);
 
-  if (dbError) {
-    throw new Error(`Error saving payment slip: ${dbError.message}`);
-  }
-
-  return publicUrlData.publicUrl;
+  if (dbError) throw new Error(`Database error: ${dbError.message}`);
+  return publicUrl;
 }
 
 /**
- * Gets all active product categories
+ * ADMIN FUNCTIONS
  */
-export async function getProductCategories() {
-  const { data, error } = await supabase
-    .from('product_category_labels')
-    .select('*')
-    .eq('is_active', true);
 
-  if (error) {
-    throw new Error(`Error fetching product categories: ${error.message}`);
-  }
-
+export async function adminGetAllOrders(pageOffset: number = 0, pageLimit: number = 50) {
+  const { data, error } = await supabase.rpc('get_all_orders_admin', {
+    page_offset: pageOffset,
+    page_limit: pageLimit
+  });
+  if (error) throw new Error(`Admin error: ${error.message}`);
   return data;
 }
 
-/**
- * Gets all active products, optionally filtered by category
- */
-export async function getProducts(categoryId?: string) {
-  let query = supabase
-    .from('products')
-    .select('*')
-    .eq('is_active', true);
-
-  if (categoryId) {
-    query = query.eq('category_id', categoryId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw new Error(`Error fetching products: ${error.message}`);
-  }
-
-  return data;
+export async function adminUpdateOrderStatus(orderId: string, status: string) {
+  const { error } = await supabase.rpc('admin_update_order_status', {
+    order_uuid: orderId,
+    new_status: status
+  });
+  if (error) throw new Error(`Admin error: ${error.message}`);
 }
 
-/**
- * Gets a specific product by ID
- */
-export async function getProductById(productId: string) {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', productId)
-    .eq('is_active', true)
-    .single();
-
-  if (error) {
-    throw new Error(`Error fetching product: ${error.message}`);
-  }
-
-  return data;
+export async function adminVerifyPayment(slipId: string, verified: boolean = true) {
+  const { error } = await supabase.rpc('admin_verify_payment_slip', {
+    slip_uuid: slipId,
+    verified_status: verified
+  });
+  if (error) throw new Error(`Admin error: ${error.message}`);
 }
 
-/**
- * Gets all orders for the current user
- */
-export async function getUserOrders() {
-  const { data, error } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      total_amount,
-      payment_method,
-      status,
-      created_at,
-      order_items (
-        quantity,
-        price,
-        products (
-          name
-        )
-      ),
-      delivery_addresses (
-        full_name,
-        phone,
-        address
-      )
-    `)
-    .eq('user_id', supabase.auth.currentSession?.user.id)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(`Error fetching user orders: ${error.message}`);
-  }
-
-  return data;
+export async function adminDeleteProduct(productId: string) {
+  const { error } = await supabase.rpc('admin_delete_product', {
+    product_uuid: productId
+  });
+  if (error) throw new Error(`Admin error: ${error.message}`);
 }
 
-/**
- * Gets a specific order for the current user
- */
-export async function getUserOrder(orderId: string) {
-  const { data, error } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      total_amount,
-      payment_method,
-      status,
-      created_at,
-      order_items (
-        quantity,
-        price,
-        products (
-          name,
-          description
-        )
-      ),
-      delivery_addresses (
-        full_name,
-        phone,
-        address
-      )
-    `)
-    .eq('id', orderId)
-    .eq('user_id', supabase.auth.currentSession?.user.id)
-    .single();
+export async function adminDeleteCategory(categoryId: string) {
+  const { error } = await supabase.rpc('admin_delete_category', {
+    category_uuid: categoryId
+  });
+  if (error) throw new Error(`Admin error: ${error.message}`);
+}
 
-  if (error) {
-    throw new Error(`Error fetching user order: ${error.message}`);
-  }
+export async function adminDeleteOrder(orderId: string) {
+  const { error } = await supabase.rpc('admin_delete_order', {
+    order_uuid: orderId
+  });
+  if (error) throw new Error(`Admin error: ${error.message}`);
+}
 
-  return data;
+export async function getMetrics() {
+  const { data, error } = await supabase.rpc('get_business_metrics');
+  if (error) throw error;
+  return data[0];
 }
