@@ -1,17 +1,17 @@
-# 🚀 Kamisori Backend: Complete Deployment Guide
+# Kamisori Backend: Complete Deployment Guide
 
-This guide is for developers who want to set up the **Kamisori Backend** from scratch. Even if you have never used the Supabase CLI, this guide will walk you through every click and command.
+This guide is for Zwe Lin Naing and Thu Htet Naing who want to set up the **Kamisori Backend** from scratch. Even if you have never used the Supabase CLI, this guide will walk you through every click and command.
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 - **Google Account** (to handle emails and login)
 - **Node.js** [Download here](https://nodejs.org/)
 - **Supabase Account** [Sign up here](https://supabase.com/)
 
 ---
 
-## 1️⃣ Phase One: The Supabase Dashboard
+## Phase One: The Supabase Dashboard
 No terminal needed for this part.
 
 ### 1.1 Create the Project
@@ -44,7 +44,7 @@ No terminal needed for this part.
 
 ---
 
-## 2️⃣ Phase Two: Environment Secrets
+## Phase Two: Environment Secrets
 These are the most important settings for the system to work.
 
 1. Go to **Settings** -> **Edge Functions**.
@@ -58,7 +58,7 @@ These are the most important settings for the system to work.
 
 ---
 
-## 3️⃣ Phase Three: The Supabase CLI
+## Phase Three: The Supabase CLI
 This part puts the logic (Edge Functions) onto the server.
 
 ### 3.1 Install the CLI
@@ -85,7 +85,7 @@ supabase functions deploy update-order-status --no-verify-jwt
 
 ---
 
-## 4️⃣ Phase Four: Create your Admin Account
+## Phase Four: Create your Admin Account
 1. Go to your frontend (`demo-frontend.html`) and **Sign in with Google**.
 2. Go to the Supabase Dashboard -> **SQL Editor**.
 3. Run this to give yourself Admin powers:
@@ -96,7 +96,7 @@ supabase functions deploy update-order-status --no-verify-jwt
 
 ---
 
-## ✅ Deployment Checklist
+## Deployment Checklist
 - [ ] Database tables exist?
 - [ ] Storage buckets created?
 - [ ] Google OAuth enabled?
@@ -104,4 +104,4 @@ supabase functions deploy update-order-status --no-verify-jwt
 - [ ] All 3 Edge Functions deployed successfully?
 - [ ] No `NOT_FOUND` or `Unauthorized` errors when clicking email buttons?
 
-**You are now fully set up!** 🍱
+**You are now fully set up.**

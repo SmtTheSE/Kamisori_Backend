@@ -196,7 +196,7 @@ const orderId = await processCheckout('kbz_pay'); // or 'cod'
 
 ### Checking Database Logs
 
-You can check the database logs in your Supabase dashboard under Database → Logs to troubleshoot issues.
+You can check the database logs in your Supabase dashboard under Database -> Logs to troubleshoot issues.
 
 ## Security Best Practices
 
