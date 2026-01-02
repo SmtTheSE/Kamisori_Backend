@@ -12,14 +12,16 @@ This is a secure, scalable e-commerce backend built with Supabase for a local cl
 
 ## Core Components
 
-1. User authentication with role-based access
+1. **Google OAuth** authentication for reliable customer identity
 2. Season/year product categorization
 3. Shopping cart with server-side calculation
 4. Immutable order snapshots
 5. Payment slip verification system
-6. Email notifications via Gmail SMTP (Edge Functions)
-7. **NEW: Comprehensive admin CRUD functions**
-8. Secure admin panel
+6. Professional email notifications (Gmail SMTP):
+   - **Admin**: "Forwarded" from buyer via `Reply-To`.
+   - **Customer**: Formal updates from "The Kamisori Team".
+   - **Quick Actions**: One-click status updates directly from the admin email.
+7. Secure admin panel for centralized management
 
 ## Tech Stack
 

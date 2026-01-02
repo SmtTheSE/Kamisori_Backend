@@ -25,6 +25,15 @@ Execute the SQL in the following order:
 
 1. Run [001_initial_schema.sql](file:///Users/sittminthar/Desktop/Kamisori%20Backend/database/migrations/001_initial_schema.sql)
 2. Run [002_order_status_trigger.sql](file:///Users/sittminthar/Desktop/Kamisori%20Backend/database/migrations/002_order_status_trigger.sql)
+... (Run all migrations in order) ...
+
+> [!IMPORTANT]
+> **Update Notification Triggers**: 
+> Before running migrations `012` and `014`, open them and replace:
+> - `YOUR_PROJECT_REF` with your Supabase Project Reference.
+> - `YOUR_SUPABASE_ANON_KEY` with your project's Anonymous Key.
+> 
+> This is necessary for the database triggers to securely call your Edge Functions.
 
 You can run these migrations in the Supabase SQL Editor or using the Supabase CLI.
 
@@ -39,21 +48,25 @@ The migrations already include RLS policies, but make sure RLS is enabled on you
    - `product-images` - Set to public read, admin write
    - `payment-slips` - Set to private, admin read
 
-## Step 4: Set up Auth
+## Step 4: Set up Auth & Google OAuth
 
-1. In your Supabase dashboard, go to Authentication → Settings
-2. Configure your email provider settings
-3. Set up email templates as needed
+1. In your Supabase dashboard, go to **Authentication** -> **Providers**.
+2. **Setup Google OAuth**:
+   - Enable the Google provider.
+   - Enter your **Google Client ID** and **Client Secret** (obtained from [Google Cloud Console](https://console.cloud.google.com/)).
+   - Add the Supabase Redirect URI to your Google Cloud Console "Authorized redirect URIs".
+3. In Authentication -> **URL Configuration**, set your "Site URL" to your frontend URL (e.g., `http://localhost:3000` or your domain).
 
 ## Step 5: Configure Environment Variables
 
 For the Edge Functions, you'll need to set the following environment variables in your Supabase project:
 
-- `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Your service role key
-- `ADMIN_EMAIL` - Your Gmail address (where notifications will be sent)
-- `SMTP_USER` - Your Gmail address (for sending)
-- `SMTP_PASSWORD` - Your 16-character Google App Password
+- `SUPABASE_URL` - Your Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY` - Your service role key (for database access).
+- `ADMIN_EMAIL` - The Gmail address where **you** want to receive order notifications.
+- `ADMIN_SECRET_TOKEN` - A secret string of your choice to protect the email "Status Update" buttons.
+- `SMTP_USER` - A dedicated Gmail address to act as the "Postman" (System Sender).
+- `SMTP_PASSWORD` - The 16-character **Google App Password** for the `SMTP_USER` account.
 
 > [!TIP]
 > **How to get a Gmail App Password:**
@@ -80,8 +93,13 @@ For the Edge Functions, you'll need to set the following environment variables i
 
 4. Deploy the functions:
    ```bash
+   # Deploy core notification functions
    supabase functions deploy notify-admin
    supabase functions deploy notify-customer
+
+   # IMPORTANT: Deploy the status update function without JWT verification
+   # (This allows the buttons in the email to work directly)
+   supabase functions deploy update-order-status --no-verify-jwt
    ```
 
 ## Step 7: Configure Database Webhooks

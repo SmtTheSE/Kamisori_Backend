@@ -160,7 +160,8 @@
     <h1>Local Clothing Brand E-Commerce</h1>
 
     <div class="auth-section">
-        <button id="loginBtn">Login</button>
+        <button id="loginBtn">Login (Email/Pass)</button>
+        <button id="googleLoginBtn" style="background-color: #4285F4; color: white;">Sign in with Google</button>
         <button id="logoutBtn" class="hidden">Logout</button>
         <span id="userStatus">Not logged in</span>
     </div>
@@ -293,6 +294,7 @@
 
         // DOM Elements
         const loginBtn = document.getElementById('loginBtn');
+        const googleLoginBtn = document.getElementById('googleLoginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const userStatus = document.getElementById('userStatus');
         const productsContainer = document.getElementById('productsContainer');
@@ -658,10 +660,14 @@
                         variantsHtml += `
                             <div style="margin: 5px 0;">
                                 <label>Color:</label>
-                                <select id="color-${product.id}">
-                                    <option value="">Select Color</option>
-                                    ${product.colors.map(c => `<option value="${c}">${c}</option>`).join('')}
-                                </select>
+                                <div class="color-options" id="color-${product.id}-options">
+                                    ${product.colors.map(c => `
+                                        <label class="color-option">
+                                            <input type="radio" name="color-${product.id}" value="${c}" style="display: none;">
+                                            <span class="color-swatch" style="background-color: ${c}; border: 2px solid #ccc; width: 30px; height: 30px; display: inline-block; margin: 0 5px; cursor: pointer; border-radius: 50%;" title="${c}"></span>
+                                        </label>
+                                    `).join('')}
+                                </div>
                             </div>
                         `;
                     }
@@ -738,15 +744,15 @@
 
                 // Get selected variants
                 const sizeSelect = document.getElementById(`size-${productId}`);
-                const colorSelect = document.getElementById(`color-${productId}`);
+                const colorRadioGroup = document.querySelector(`input[name="color-${productId}"]:checked`);
                 const size = sizeSelect ? sizeSelect.value : '';
-                const color = colorSelect ? colorSelect.value : '';
+                const color = colorRadioGroup ? colorRadioGroup.value : '';
 
                 if (sizeSelect && !size) {
                     showStatus('Please select a size', false);
                     return;
                 }
-                if (colorSelect && !color) {
+                if (document.getElementById(`color-${productId}-options`) && !color) {
                     showStatus('Please select a color', false);
                     return;
                 }
@@ -860,7 +866,10 @@
                     if (item.size || item.color) {
                         const parts = [];
                         if (item.size) parts.push(`Size: ${item.size}`);
-                        if (item.color) parts.push(`Color: ${item.color}`);
+                        if (item.color) {
+                            // Create a color swatch for the color code
+                            parts.push(`<span>Color: <span style="display:inline-block; width:15px; height:15px; background-color:${item.color}; border:1px solid #ccc; margin:0 5px; vertical-align:middle;"></span>${item.color}</span>`);
+                        }
                         variantsText = `<div style="font-size: 0.9em; color: #666;">${parts.join(', ')}</div>`;
                     }
 
@@ -962,7 +971,10 @@
                             if (item.size || item.color) {
                                 const variants = [];
                                 if (item.size) variants.push(`Size: ${item.size}`);
-                                if (item.color) variants.push(`Color: ${item.color}`);
+                                if (item.color) {
+                                    // Create a color swatch for the color code
+                                    variants.push(`<span>Color: <span style="display:inline-block; width:15px; height:15px; background-color:${item.color}; border:1px solid #ccc; margin:0 5px; vertical-align:middle;"></span>${item.color}</span>`);
+                                }
                                 variantInfo = ` (${variants.join(', ')})`;
                             }
                             return `${item.product_name}${variantInfo} x${item.quantity}`;
@@ -1084,6 +1096,19 @@
         }
 
         // Event Listeners
+        googleLoginBtn.addEventListener('click', async () => {
+            const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin + window.location.pathname
+                }
+            });
+
+            if (error) {
+                showStatus(`Google Login error: ${error.message}`, false);
+            }
+        });
+
         loginBtn.addEventListener('click', async () => {
             const email = prompt('Enter your email:');
             const password = prompt('Enter your password:');
@@ -1111,6 +1136,7 @@
             await supabaseClient.auth.signOut();
             userStatus.textContent = 'Not logged in';
             loginBtn.classList.remove('hidden');
+            googleLoginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
             adminSection.style.display = 'none';
             showStatus('Logged out successfully!');
@@ -1150,12 +1176,14 @@
                 if (session) {
                     userStatus.textContent = `Logged in as: ${session.user.email}`;
                     loginBtn.classList.add('hidden');
+                    googleLoginBtn.classList.add('hidden');
                     logoutBtn.classList.remove('hidden');
                     loadCart();
                     checkAdminStatus();
                 } else {
                     userStatus.textContent = 'Not logged in';
                     loginBtn.classList.remove('hidden');
+                    googleLoginBtn.classList.remove('hidden');
                     logoutBtn.classList.add('hidden');
                     adminSection.style.display = 'none';
                 }

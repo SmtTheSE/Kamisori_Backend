@@ -37,7 +37,7 @@ const corsHeaders = {
 };
 
 // Helper function to send email via Gmail SMTP
-async function sendGmail(to: string, subject: string, html: string) {
+async function sendGmail(to: string, subject: string, html: string, replyTo?: string, fromName?: string) {
   const SMTP_USER = Deno.env.get("SMTP_USER");
   const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD");
 
@@ -56,8 +56,9 @@ async function sendGmail(to: string, subject: string, html: string) {
     });
 
     await client.send({
-      from: SMTP_USER,
+      from: fromName ? `${fromName} <${SMTP_USER}>` : SMTP_USER,
       to: to,
+      replyTo: replyTo,
       subject: subject,
       content: html,
       html: html,
@@ -173,22 +174,22 @@ serve(async (req) => {
     const { data: userData } = await supabaseClient.auth.admin.getUserById(order.user_id);
     const customerEmail = userData?.user?.email || payload.user_email || "N/A";
     const userMeta = userData?.user?.user_metadata || {};
+    const deliveryAddress = order.delivery_addresses?.[0] || null;
+    const customerFullName = deliveryAddress?.full_name || userMeta.full_name || userMeta.name || customerEmail;
 
     let subject = "";
     let htmlContent = "";
 
     if (notification_type === 'new_order') {
       subject = `New Order #${order.id.substring(0, 8)} Received`;
-      const productsList = order.order_items.map(item => {
+
+      const itemsHtml = order.order_items.map(item => {
         const variants = [];
         if (item.size) variants.push(`Size: ${item.size}`);
         if (item.color) variants.push(`Color: ${item.color}`);
         const variantsText = variants.length > 0 ? ` (${variants.join(', ')})` : '';
-        return `- ${item.products.name}${variantsText} x${item.quantity} - ${item.price} MMK`;
-      }).join('<br>');
-
-      const deliveryAddress = order.delivery_addresses?.[0] || null;
-      const customerFullName = deliveryAddress?.full_name || userMeta.full_name || userMeta.name || customerEmail;
+        return `<li>${item.products.name}${variantsText} x${item.quantity} - ${item.price} MMK</li>`;
+      }).join('');
 
       htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
@@ -200,16 +201,39 @@ serve(async (req) => {
             <p><strong>Payment Method:</strong> ${order.payment_method.toUpperCase().replace('_', ' ')}</p>
             <p><strong>Status:</strong> <span style="background: #e3f2fd; padding: 2px 8px; border-radius: 4px;">${order.status}</span></p>
           </div>
+          
           <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Customer Details</h3>
           <p><strong>Name:</strong> ${customerFullName}</p>
           <p><strong>Email:</strong> ${customerEmail}</p>
           ${deliveryAddress ? `<p><strong>Phone:</strong> ${deliveryAddress.phone}</p>` : ''}
+          
           <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Delivery Address</h3>
           ${deliveryAddress ? `<p style="background: #f9f9f9; padding: 10px; border-radius: 5px; line-height: 1.5;">${deliveryAddress.address}</p>` : '<p style="color: #d32f2f;">No delivery address provided</p>'}
+          
           <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Ordered Items</h3>
-          <div style="margin-bottom: 20px;">${productsList}</div>
-          <p style="font-size: 0.9em; color: #666; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
-            Kamisori E-Commerce - Admin Notification (SMTP)
+          <ul style="padding-left: 20px;">
+            ${itemsHtml}
+          </ul>
+
+          <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Quick Actions</h3>
+          <p style="margin-bottom: 15px; color: #666;">Contact the buyer or update order status:</p>
+          <div style="margin-top: 20px;">
+            <a href="mailto:${customerEmail}" 
+               style="display: inline-block; background-color: #6b7280; color: white; padding: 12px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 0 10px 10px 0;">
+               📧 Reply to Customer
+            </a>
+            <a href="${Deno.env.get("SUPABASE_URL")}/functions/v1/update-order-status?order_id=${order.id}&status=confirmed&token=${Deno.env.get("ADMIN_SECRET_TOKEN") || 'kamisori-admin-secret'}" 
+               style="display: inline-block; background-color: #3b82f6; color: white; padding: 12px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 0 10px 10px 0;">
+               ✅ Confirm Order
+            </a>
+            <a href="${Deno.env.get("SUPABASE_URL")}/functions/v1/update-order-status?order_id=${order.id}&status=paid&token=${Deno.env.get("ADMIN_SECRET_TOKEN") || 'kamisori-admin-secret'}" 
+               style="display: inline-block; background-color: #10b981; color: white; padding: 12px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 0 10px 10px 0;">
+               💰 Mark as Paid
+            </a>
+          </div>
+
+          <p style="font-size: 0.8em; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
+            Kamisori E-Commerce - Admin Notification
           </p>
         </div>
       `;
@@ -220,13 +244,27 @@ serve(async (req) => {
           <h2 style="color: #333; border-bottom: 2px solid #333; padding-bottom: 10px;">Payment Slip Received</h2>
           <p>A customer has uploaded a payment slip for their order. Please verify the transaction.</p>
           <div style="background: #fdf2f2; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-             <p><strong>Order ID:</strong> #${order.id.substring(0, 8)}</p>
-             <p><strong>Amount:</strong> ${order.total_amount} MMK</p>
-             <p><strong>Customer:</strong> ${customerEmail}</p>
+            <p><strong>Order ID:</strong> #${order.id.substring(0, 8)}</p>
+            <p><strong>Amount:</strong> ${order.total_amount} MMK</p>
+            <p><strong>Customer:</strong> ${customerFullName} (${customerEmail})</p>
           </div>
+          
           <a href="${slip_url}" style="display: block; width: 200px; background: #3b82f6; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; margin: 20px 0;">View Payment Slip</a>
-          <p style="font-size: 0.9em; color: #666; border-top: 1px solid #eee; padding-top: 10px;">
-            Kamisori E-Commerce - Admin Notification (SMTP)
+
+          <h3 style="border-bottom: 1px solid #eee; padding-bottom: 5px;">Quick Actions</h3>
+          <div style="margin-top: 20px;">
+            <a href="${Deno.env.get("SUPABASE_URL")}/functions/v1/update-order-status?order_id=${order.id}&status=paid&token=${Deno.env.get("ADMIN_SECRET_TOKEN") || 'kamisori-admin-secret'}" 
+               style="display: inline-block; background-color: #10b981; color: white; padding: 12px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 0 10px 10px 0;">
+               ✅ Approve Payment
+            </a>
+            <a href="${Deno.env.get("SUPABASE_URL")}/functions/v1/update-order-status?order_id=${order.id}&status=cancelled&token=${Deno.env.get("ADMIN_SECRET_TOKEN") || 'kamisori-admin-secret'}" 
+               style="display: inline-block; background-color: #ef4444; color: white; padding: 12px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 0 10px 10px 0;">
+               ❌ Reject & Cancel
+            </a>
+          </div>
+
+          <p style="font-size: 0.8em; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
+            Kamisori E-Commerce - Admin Notification
           </p>
         </div>
       `;
@@ -234,7 +272,9 @@ serve(async (req) => {
 
     if (subject && htmlContent) {
       try {
-        await sendGmail(adminEmail, subject, htmlContent);
+        const fromName = notification_type === 'new_order' ? `${customerFullName} (via Kamisori)` : "Kamisori System";
+        await sendGmail(adminEmail, subject, htmlContent, customerEmail, fromName);
+
         await supabaseClient.from("trigger_logs").insert({
           level: 'info',
           message: `Email SENT successfully via SMTP`,

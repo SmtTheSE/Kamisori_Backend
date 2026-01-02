@@ -44,7 +44,7 @@ begin
   if (NEW.status in ('paid', 'confirmed', 'shipped', 'delivered', 'cancelled') 
       and OLD.status != NEW.status) then
     perform net.http_post(
-      url := 'https://ffsldhalkpxhzrhoukzh.functions.supabase.co/notify-customer',
+      url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/notify-customer',
       body := json_build_object(
         'order_id', NEW.id,
         'new_status', NEW.status
@@ -67,15 +67,21 @@ create or replace function notify_admin_payment()
 returns trigger as $$
 begin
   perform net.http_post(
-    url := 'https://ffsldhalkpxhzrhoukzh.functions.supabase.co/notify-admin',
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/notify-admin',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'YOUR_SUPABASE_ANON_KEY',
+      'Authorization', 'Bearer YOUR_SUPABASE_ANON_KEY'
+    ),
     body := json_build_object(
       'order_id', new.order_id,
-      'slip_url', new.image_url
+      'slip_url', new.image_url,
+      'notification_type', 'payment_uploaded'
     )::jsonb
   );
   return new;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 drop trigger if exists payment_uploaded on public.payment_slips;
 create trigger payment_uploaded
@@ -225,10 +231,7 @@ for all using (is_admin());
 drop policy if exists "Admin manage order notifications" on public.order_notifications;
 create policy "Admin manage order notifications" on public.order_notifications 
 for all using (is_admin());
--- Trigger for new order notifications (Fired after delivery address is saved)
-drop trigger if exists new_order_delivery_notification on public.delivery_addresses;
-create trigger new_order_delivery_notification
-  after insert on public.delivery_addresses
-  for each row execute function notify_admin_new_order();
+-- Trigger definitions are now primarily managed in 014_admin_notifications_monitoring.sql
+-- (Duplicate definitions removed here for clarity)
 
 

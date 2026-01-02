@@ -37,13 +37,13 @@ begin
   left join auth.users au on o.user_id = au.id
   where o.id = v_order_id;
 
-  -- Call Edge Function WITH Authorization Header
+  -- Call Edge Function for Admin
   perform net.http_post(
-    url := 'https://ffsldhalkpxhzrhoukzh.supabase.co/functions/v1/notify-admin',
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/notify-admin',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'apikey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmc2xkaGFsa3B4aHpyaG91a3poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwNTY3OTYsImV4cCI6MjA4MjYzMjc5Nn0.hsifO6ucSx9HZ_Rfb7EAmXvJ_r-vRMWvMqPmlkJdIQo',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmc2xkaGFsa3B4aHpyaG91a3poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwNTY3OTYsImV4cCI6MjA4MjYzMjc5Nn0.hsifO6ucSx9HZ_Rfb7EAmXvJ_r-vRMWvMqPmlkJdIQo'
+      'apikey', 'YOUR_SUPABASE_ANON_KEY',
+      'Authorization', 'Bearer YOUR_SUPABASE_ANON_KEY'
     ),
     body := json_build_object(
       'order_id', v_order_id,
@@ -53,6 +53,20 @@ begin
       'payment_method', v_order_data.payment_method,
       'status', v_order_data.status,
       'created_at', v_order_data.created_at
+    )::jsonb
+  );
+
+  -- Also notify Customer immediately (Order Received)
+  perform net.http_post(
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/notify-customer',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'YOUR_SUPABASE_ANON_KEY',
+      'Authorization', 'Bearer YOUR_SUPABASE_ANON_KEY'
+    ),
+    body := json_build_object(
+      'order_id', v_order_id,
+      'new_status', 'received'
     )::jsonb
   );
 
